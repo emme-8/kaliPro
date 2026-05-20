@@ -81,15 +81,33 @@ function filesfol(respo, v1, v2, v3, var32) {
     var uo = document.getElementById("resp");
     uo.style.display = "block";
 
-    // Mostra/nascondi i controlli galleria
-    if (respo.indexOf("imgview") === -1 && respo.indexOf("fileview") === -1 && respo.indexOf("dialogview") === -1) {
-        document.getElementById("gallery-controls").style.display = "block";
+    // ----- Gestione pannello galleria (mostra/nascondi) -----
+    var galleryPanel = document.getElementById("gallery-controls");
+    if (!galleryPanel) {
+        // Se manca il pannello (es. HTML non aggiornato), esci senza errori
+        console.warn("gallery-controls non trovato nel DOM");
     } else {
-        document.getElementById("gallery-controls").style.display = "none";
+        // Mostra il pannello SOLO quando siamo nella lista di file/cartelle
+        if (respo === "imgview" || respo === "fileview" || respo === "dialogview") {
+            galleryPanel.style.display = "none";
+        } else {
+            galleryPanel.style.display = "block";
+            // Assicura che il pannello sia visibile sopra tutto (fixed in alto)
+            galleryPanel.style.position = "fixed";
+            galleryPanel.style.top = "55px";    // subito sotto la barra del titolo
+            galleryPanel.style.left = "10px";
+            galleryPanel.style.right = "10px";
+            galleryPanel.style.zIndex = "99999";
+            galleryPanel.style.background = "#001";
+            galleryPanel.style.padding = "10px";
+            galleryPanel.style.borderRadius = "5px";
+            galleryPanel.style.textAlign = "center";
+        }
     }
 
-    // Logica originale di visualizzazione file/cartelle
+    // ----- Logica originale di visualizzazione file/cartelle -----
     if (respo == "imgview") {
+        // Anteprima immagine a schermo intero (base64)
         document.getElementById("fprev").style.display = "block";
         document.getElementById("imv2").style.display = "none";
         document.getElementById("imv").style.display = "inline";
@@ -97,6 +115,7 @@ function filesfol(respo, v1, v2, v3, var32) {
         document.getElementById("fprevdes").innerHTML = v2 + '<li><a download="" id="btdwn" target="_blank" href="data:image/png;base64,' + v1 + '">Download File</a><br>';
     }
     else if (respo == "fileview") {
+        // Visualizzazione file generico (es. HTML, testo, ecc.)
         document.getElementById("fprev").style.display = "block";
         document.getElementById("imv2").style.display = "inline";
         document.getElementById("imv2").src = v1;
@@ -107,7 +126,7 @@ function filesfol(respo, v1, v2, v3, var32) {
         showdialog(v1);
     }
     else {
-        // Elenco di file e cartelle
+        // Lista di file e cartelle (il dispositivo ha inviato HTML)
         uo.innerHTML = "" + respo;
     }
 }
