@@ -86,25 +86,25 @@ function showThumbnails() {
 }
 
 function fetchNextThumbnail() {
-    // Se abbiamo raggiunto la fine del batch o della coda
+    // Se il batch è terminato o la coda è esaurita, ferma tutto
     if (thumbnailIndex >= thumbnailQueue.length || 
         (thumbnailIndex - batchStart >= THUMB_BATCH_SIZE)) {
 
-        console.log("Batch completato: thumbnailIndex=" + thumbnailIndex + 
-                    ", batchStart=" + batchStart + 
-                    ", queue length=" + thumbnailQueue.length);
         thumbBatchActive = false;
         var btn = document.querySelector("#gallery-controls button:first-child");
         if (btn) {
             btn.disabled = false;
             btn.textContent = "Carica altre " + THUMB_BATCH_SIZE + " anteprime";
         }
-        $("#preloaderr").fadeOut();
-        document.getElementById("loadtxt").innerText = 
+        // Spegni il loader forzatamente
+        var loader = document.getElementById("preloaderr");
+        if (loader) loader.style.display = "none";
+        if (document.getElementById("loadtxt")) document.getElementById("loadtxt").innerText = 
             "Batch completato (" + thumbnailIndex + "/" + thumbnailQueue.length + ")";
         return;
     }
 
+    // Carica la prossima immagine
     var fileElement = thumbnailQueue[thumbnailIndex];
     var fileName = "";
     var child = fileElement.firstChild;
@@ -118,22 +118,25 @@ function fetchNextThumbnail() {
     window._currentThumbElement = fileElement;
     manager = "thumbnailfetch";
 
-    $("#preloaderr").fadeIn();
+    // Mostra il loader
+    var loader = document.getElementById("preloaderr");
+    if (loader) loader.style.display = "flex";
     document.getElementById("loadtxt").innerText = 
         "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
 
     setdatcmd("cd", fullPath, "", respov);
 
-    // Timeout di sicurezza (3 secondi per dispositivi lenti)
+    // Timeout di sicurezza (3 secondi)
     var idx = thumbnailIndex;
     setTimeout(function() {
         if (manager === "thumbnailfetch" && idx === thumbnailIndex && idx < thumbnailQueue.length) {
-            console.warn("Timeout per " + fileName + " (indice " + idx + ")");
-            $("#preloaderr").fadeOut();
+            console.warn("Timeout per " + fileName);
+            var loader = document.getElementById("preloaderr");
+            if (loader) loader.style.display = "none";
             thumbnailIndex++;
             fetchNextThumbnail();
         }
-    }, 3000); // aumentato a 3 secondi
+    }, 3000);
 }
 
 function filesfol(respo, v1, v2, v3, var32) {
