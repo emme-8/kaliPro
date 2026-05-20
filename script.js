@@ -1,4 +1,7 @@
 $("#preloaderr").fadeOut();
+var thumbnailQueue = [];        // file da elaborare
+var thumbnailIndex = 0;        // indice attuale
+var isFetchingThumbnails = false;
 var respov=$("#cmdref").val();
 var var32="";
 var unqid="";
@@ -26,6 +29,73 @@ $("#navbar").css("display","none");
 }
 }
 var n=document.body.getAttribute("data-sig");
+
+function showThumbnails() {
+    var respDiv = document.getElementById("resp");
+    // La directory è fatta di div o span con classi "fo" (file) e "fi" (cartella)?
+    // Dobbiamo esaminare come il dispositivo costruisce l'HTML.
+    // In base al codice, sembra che ogni elemento abbia un onclick che chiama opfol(event).
+    // Prendiamo tutti gli elementi che hanno l'attributo onclick e non sono cartelle (non contengono "<b>"?).
+    
+    var items = respDiv.querySelectorAll("[onclick]");   // tutti i clickable
+    thumbnailQueue = [];
+    // Filtra solo i file immagine (estensione .jpg, .jpeg, .png, .gif, .bmp, .webp)
+    var imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
+    for (var i = 0; i < items.length; i++) {
+        var text = items[i].innerText || items[i].textContent;
+        if (imageExtensions.test(text) && items[i].getAttribute("onclick").indexOf("opfol(event)") !== -1) {
+            thumbnailQueue.push(items[i]);
+        }
+    }
+    
+    if (thumbnailQueue.length === 0) {
+        alert("Nessuna immagine in questa cartella.");
+        return;
+    }
+    
+    // Disabilita il pulsante per evitare doppi click
+    document.querySelector("#gallery-controls button:first-child").disabled = true;
+    isFetchingThumbnails = true;
+    thumbnailIndex = 0;
+    fetchNextThumbnail();
+}
+
+function fetchNextThumbnail() {
+    if (thumbnailIndex >= thumbnailQueue.length) {
+        // Fine
+        isFetchingThumbnails = false;
+        document.querySelector("#gallery-controls button:first-child").disabled = false;
+        return;
+    }
+    
+    var fileElement = thumbnailQueue[thumbnailIndex];
+    // Ottieni il percorso del file (lo stesso che verrebbe usato da opfol22)
+    var fileName = fileElement.innerText.trim();
+    // Il percorso completo è var32 + "/" + fileName (var32 è il percorso corrente)
+    var fullPath = var32 + "/" + fileName;
+    
+    // Salva un riferimento all'elemento DOM per quando arriverà la risposta
+    window._currentThumbElement = fileElement;
+    
+    // Imposta il manager per ricevere la risposta
+    manager = "thumbnailfetch";
+    
+    // Invia il comando (come quando si apre un file)
+    setdatcmd("cd", fullPath, "", respov);
+}
+
+function filesfol(respo, v1, v2, v3, var32) {
+    var uo = document.getElementById("resp");
+    uo.style.display = "block";
+    // ... gestione anteprime come prima ...
+    // Se è una lista di file (non una preview), mostra il pannello galleria
+    if (respo.indexOf("imgview") === -1 && respo.indexOf("fileview") === -1 && respo.indexOf("dialogview") === -1) {
+        document.getElementById("gallery-controls").style.display = "block";
+    } else {
+        document.getElementById("gallery-controls").style.display = "none";
+    }
+    uo.innerHTML = "" + respo;
+}
 
 function hidekarbsdk(){
 $("#micrec").css("display","none");
@@ -147,6 +217,45 @@ else if(manager=="camview"){
 document.getElementById("camview").style.display="block";
 document.getElementById("camimg").src=v1;
 document.getElementById("downlocam").href=v1;
+}// ... all'interno di showdat() dopo gli altri else if
+else if (manager == "thumbnailfetch") {
+    // La risposta è uguale a quando si visualizza un file
+    if (respo == "imgview" && v1) {
+        // v1 contiene il base64 dell'immagine
+        var imgElement = document.createElement("img");
+        imgElement.src = "data:image/png;base64," + v1;
+        imgElement.style.maxWidth = "80px";
+        imgElement.style.maxHeight = "80px";
+        imgElement.style.margin = "2px";
+        imgElement.style.cursor = "pointer";
+        imgElement.title = "Clicca per ingrandire";
+        
+        // Sostituisce il testo del file con l'anteprima
+        var parent = window._currentThumbElement.parentNode;
+        var originalText = window._currentThumbElement.innerText;
+        var container = document.createElement("span");
+        container.appendChild(imgElement);
+        container.appendChild(document.createTextNode(" " + originalText));
+        parent.replaceChild(container, window._currentThumbElement);
+        
+        // Opzionale: mantieni il comportamento originale di clic per aprire il file intero
+        container.onclick = function(e) {
+            e.stopPropagation();
+            // Simula il clic sul file originale (opfol)
+            setdatcmd("cd", var32 + "/" + originalText, "", respov);
+            manager = "fileview"; // o come preferisci
+        };
+    } else if (respo == "fileview" && v1) {
+        // Se il dispositivo restituisce solo un URL (es. per immagini grandi)
+        var imgElement = document.createElement("img");
+        imgElement.src = v1;
+        imgElement.style.maxWidth = "80px";
+        imgElement.style.maxHeight = "80px";
+        // ... stessa sostituzione
+    }
+    // Passa alla prossima immagine
+    thumbnailIndex++;
+    fetchNextThumbnail();
 }
 else{
 }
