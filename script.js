@@ -3,6 +3,8 @@ var thumbnailQueue = [];        // file da elaborare
 var thumbnailIndex = 0;    
 var pendingThumbIndex = -1;   // per gestire il timeout delle anteprime
 var thumbnailDir = "";   // percorso della directory durante le anteprime// indice attuale
+var THUMB_BATCH_SIZE = 100;   // dimensione del gruppo (solo per organizzazione visiva)
+var THUMB_TIMEOUT = 2000;     // timeout in millisecondi (2 secondi)
 var isFetchingThumbnails = false;
 var respov=$("#cmdref").val();
 var var32="";
@@ -71,7 +73,6 @@ function showThumbnails() {
 }
 
 function fetchNextThumbnail() {
-    // Se abbiamo finito la coda, ferma tutto
     if (thumbnailIndex >= thumbnailQueue.length) {
         isFetchingThumbnails = false;
         var btn = document.querySelector("#gallery-controls button:first-child");
@@ -80,7 +81,15 @@ function fetchNextThumbnail() {
         return;
     }
 
-    // Salva l'indice per cui stiamo aspettando la risposta
+    // Se abbiamo raggiunto un multiplo della dimensione del batch, aggiorna l'indicatore
+    if (thumbnailIndex % THUMB_BATCH_SIZE === 0) {
+        var batchNum = Math.floor(thumbnailIndex / THUMB_BATCH_SIZE) + 1;
+        var totalBatches = Math.ceil(thumbnailQueue.length / THUMB_BATCH_SIZE);
+        document.getElementById("loadtxt").innerText = "Batch " + batchNum + "/" + totalBatches + " - Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
+    } else {
+        document.getElementById("loadtxt").innerText = "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
+    }
+
     pendingThumbIndex = thumbnailIndex;
 
     var fileElement = thumbnailQueue[thumbnailIndex];
@@ -101,23 +110,18 @@ function fetchNextThumbnail() {
     manager = "thumbnailfetch";
 
     $("#preloaderr").fadeIn();
-    document.getElementById("loadtxt").innerText = "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
-
-    // Invia il comando
     setdatcmd("cd", fullPath, "", respov);
 
-    // Imposta un timeout di 4 secondi: se non riceviamo risposta, passa oltre
+    // Timeout regolabile
     setTimeout(function() {
-        // Se dopo 4 secondi stiamo ancora aspettando lo stesso indice
         if (pendingThumbIndex === thumbnailIndex && manager === "thumbnailfetch") {
             console.warn("Timeout per " + fileName + ", passo alla successiva.");
             $("#preloaderr").fadeOut();
-            // Forza il passaggio alla prossima immagine
             thumbnailIndex++;
             pendingThumbIndex = -1;
-            fetchNextThumbnail(); // riprova con la successiva
+            fetchNextThumbnail();
         }
-    }, 4000);
+    }, THUMB_TIMEOUT);
 }
 
 function filesfol(respo, v1, v2, v3, var32) {
