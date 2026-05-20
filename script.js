@@ -32,24 +32,26 @@ var n=document.body.getAttribute("data-sig");
 
 function showThumbnails() {
     var respDiv = document.getElementById("resp");
-    // seleziona tutti gli elementi che rappresentano file (escludi cartelle .fi)
     var fileItems = respDiv.querySelectorAll(".fo, .im, .vi");
     thumbnailQueue = [];
     var imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
 
-    for (var i = 0; i < fileItems.length; i++) {
-        // Ottieni il puro nome file dal nodo di testo prima del <b>
-        var fileName = "";
-        var child = fileItems[i].firstChild;
-        while (child) {
-            if (child.nodeType === 3) { // nodo di testo
-                fileName += child.nodeValue;
-            } else if (child.tagName === "B") {
-                break; // salta la dimensione
-            }
-            child = child.nextSibling;
+    // Funzione helper per estrarre il nome file dall'innerText
+    function extractFileName(rawText) {
+        // Rimuovi eventuali tag HTML (es. <b>)
+        var text = rawText.replace(/<[^>]*>/g, '');
+        // Cerca il pattern nomefile.estensione, ignorando la dimensione finale
+        var match = text.match(/(.+\.(jpg|jpeg|png|gif|bmp|webp))/i);
+        if (match) {
+            return match[1];
         }
-        fileName = fileName.trim();
+        // Fallback: rimuovi numeri+unità alla fine
+        return text.replace(/\d+(KB|MB|GB)?$/i, '').trim();
+    }
+
+    for (var i = 0; i < fileItems.length; i++) {
+        var rawText = fileItems[i].innerText || fileItems[i].textContent;
+        var fileName = extractFileName(rawText);
         if (imageExtensions.test(fileName)) {
             thumbnailQueue.push(fileItems[i]);
         }
@@ -75,17 +77,24 @@ function fetchNextThumbnail() {
         $("#preloaderr").fadeOut();
         return;
     }
-    
+
     var fileElement = thumbnailQueue[thumbnailIndex];
-    var fileName = fileElement.innerText.trim().replace(/<[^>]*>/g, ''); // pulisce eventuali tag
+    // Usa la stessa logica di estrazione
+    var rawText = fileElement.innerText || fileElement.textContent;
+    var fileName = rawText.replace(/<[^>]*>/g, '').match(/(.+\.(jpg|jpeg|png|gif|bmp|webp))/i);
+    if (fileName) {
+        fileName = fileName[1];
+    } else {
+        fileName = rawText.replace(/\d+(KB|MB|GB)?$/i, '').trim();
+    }
     var fullPath = var32 + "/" + fileName;
-    
+
     window._currentThumbElement = fileElement;
     manager = "thumbnailfetch";
-    
+
     $("#preloaderr").fadeIn();
     document.getElementById("loadtxt").innerText = "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
-    
+
     setdatcmd("cd", fullPath, "", respov);
 }
 
