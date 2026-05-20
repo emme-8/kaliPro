@@ -32,22 +32,28 @@ var n=document.body.getAttribute("data-sig");
 
 function showThumbnails() {
     var respDiv = document.getElementById("resp");
-    var fileItems = respDiv.getElementsByClassName("fo"); // i file hanno classe "fo"
+    // Prendi tutti gli elementi che rappresentano file (immagini, video, file generici)
+    // Escludi solo le cartelle (.fi)
+    var fileItems = respDiv.querySelectorAll(".fo, .im, .vi");
     thumbnailQueue = [];
     var imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
-    
+
     for (var i = 0; i < fileItems.length; i++) {
-        var text = fileItems[i].innerText || fileItems[i].textContent;
-        if (imageExtensions.test(text)) {
+        // Estrai il testo visibile (nome file + dimensione)
+        var rawText = fileItems[i].innerText || fileItems[i].textContent;
+        // Rimuovi il contenuto del tag <b> (la dimensione) e spazi superflui
+        var fileName = rawText.replace(/<b[^>]*>.*?<\/b>/gi, '').trim();
+        // Se il nome finisce con un'estensione immagine
+        if (imageExtensions.test(fileName)) {
             thumbnailQueue.push(fileItems[i]);
         }
     }
-    
+
     if (thumbnailQueue.length === 0) {
         alert("Nessuna immagine in questa cartella.");
         return;
     }
-    
+
     var btn = document.querySelector("#gallery-controls button:first-child");
     if (btn) btn.disabled = true;
     isFetchingThumbnails = true;
