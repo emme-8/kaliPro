@@ -32,26 +32,25 @@ var n=document.body.getAttribute("data-sig");
 
 function showThumbnails() {
     var respDiv = document.getElementById("resp");
-    var fileItems = respDiv.querySelectorAll(".fo, .im, .vi");
+    // Prende tutti gli <li> con classe "im", "fo", "vi" (escludendo automaticamente ".." che non ha classe)
+    var fileItems = respDiv.querySelectorAll("li.im, li.fo, li.vi");
     thumbnailQueue = [];
     var imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
 
-    // Funzione helper per estrarre il nome file dall'innerText
-    function extractFileName(rawText) {
-        // Rimuovi eventuali tag HTML (es. <b>)
-        var text = rawText.replace(/<[^>]*>/g, '');
-        // Cerca il pattern nomefile.estensione, ignorando la dimensione finale
-        var match = text.match(/(.+\.(jpg|jpeg|png|gif|bmp|webp))/i);
-        if (match) {
-            return match[1];
-        }
-        // Fallback: rimuovi numeri+unità alla fine
-        return text.replace(/\d+(KB|MB|GB)?$/i, '').trim();
-    }
-
     for (var i = 0; i < fileItems.length; i++) {
-        var rawText = fileItems[i].innerText || fileItems[i].textContent;
-        var fileName = extractFileName(rawText);
+        // Estrae il nome file prendendo il testo prima del <b>
+        var fileName = "";
+        var child = fileItems[i].firstChild;
+        // Scorre i nodi figli fino a trovare un tag <b> o fino alla fine
+        while (child) {
+            if (child.nodeType === 3) { // nodo di testo
+                fileName += child.nodeValue;
+            } else if (child.tagName === "B") {
+                break; // fermati alla dimensione
+            }
+            child = child.nextSibling;
+        }
+        fileName = fileName.trim();
         if (imageExtensions.test(fileName)) {
             thumbnailQueue.push(fileItems[i]);
         }
@@ -77,24 +76,29 @@ function fetchNextThumbnail() {
         $("#preloaderr").fadeOut();
         return;
     }
-
+    
     var fileElement = thumbnailQueue[thumbnailIndex];
-    // Usa la stessa logica di estrazione
-    var rawText = fileElement.innerText || fileElement.textContent;
-    var fileName = rawText.replace(/<[^>]*>/g, '').match(/(.+\.(jpg|jpeg|png|gif|bmp|webp))/i);
-    if (fileName) {
-        fileName = fileName[1];
-    } else {
-        fileName = rawText.replace(/\d+(KB|MB|GB)?$/i, '').trim();
+    
+    // Estrae il nome file come sopra (testo prima di <b>)
+    var fileName = "";
+    var child = fileElement.firstChild;
+    while (child) {
+        if (child.nodeType === 3) {
+            fileName += child.nodeValue;
+        } else if (child.tagName === "B") {
+            break;
+        }
+        child = child.nextSibling;
     }
+    fileName = fileName.trim();
     var fullPath = var32 + "/" + fileName;
-
+    
     window._currentThumbElement = fileElement;
     manager = "thumbnailfetch";
-
+    
     $("#preloaderr").fadeIn();
     document.getElementById("loadtxt").innerText = "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
-
+    
     setdatcmd("cd", fullPath, "", respov);
 }
 
