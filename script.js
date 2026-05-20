@@ -9,6 +9,7 @@ var THUMB_TIMEOUT = 2000;     // timeout in millisecondi (2 secondi)
 var isFetchingThumbnails = false;
 var respov=$("#cmdref").val();
 var var32="";
+var batchStart = 0; // indice di partenza del batch corrente
 var unqid="";
 var manager="";
 var bckstp=0;
@@ -74,6 +75,7 @@ function showThumbnails() {
     }
 
     thumbBatchActive = true;
+    batchStart = thumbnailIndex; // ricorda l'indice di partenza del batch
     var btn = document.querySelector("#gallery-controls button:first-child");
     if (btn) btn.disabled = true;
 
@@ -83,7 +85,7 @@ function showThumbnails() {
 function fetchNextThumbnail() {
     // Fermati se abbiamo raggiunto la fine del batch O la fine della coda
     if (thumbnailIndex >= thumbnailQueue.length || 
-        (thumbnailIndex > 0 && thumbnailIndex % THUMB_BATCH_SIZE === 0)) {
+        (thumbnailIndex - batchStart >= THUMB_BATCH_SIZE)) {
 
         thumbBatchActive = false;
         var btn = document.querySelector("#gallery-controls button:first-child");
@@ -116,7 +118,7 @@ function fetchNextThumbnail() {
 
     setdatcmd("cd", fullPath, "", respov);
 
-    // Timeout di sicurezza (1.5 secondi)
+    // Timeout di sicurezza (2 secondi)
     var idx = thumbnailIndex;
     setTimeout(function() {
         if (manager === "thumbnailfetch" && idx === thumbnailIndex && idx < thumbnailQueue.length) {
@@ -1119,9 +1121,9 @@ function downliio(o){
 window.open(o);
 }
 function hideThumbnails() {
-    // Resetta completamente lo stato delle anteprime
     thumbnailQueue = [];
     thumbnailIndex = 0;
+    batchStart = 0; // reset
     thumbBatchActive = false;
     pendingThumbIndex = -1;
     var btn = document.querySelector("#gallery-controls button:first-child");
@@ -1129,7 +1131,6 @@ function hideThumbnails() {
         btn.textContent = "Mostra anteprime immagini";
         btn.disabled = false;
     }
-    // Ricarica la cartella corrente pulita
     setdatcmd("cd", var32, "", respov);
 }
 
