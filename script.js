@@ -32,18 +32,24 @@ var n=document.body.getAttribute("data-sig");
 
 function showThumbnails() {
     var respDiv = document.getElementById("resp");
-    // Prendi tutti gli elementi che rappresentano file (immagini, video, file generici)
-    // Escludi solo le cartelle (.fi)
+    // seleziona tutti gli elementi che rappresentano file (escludi cartelle .fi)
     var fileItems = respDiv.querySelectorAll(".fo, .im, .vi");
     thumbnailQueue = [];
     var imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
 
     for (var i = 0; i < fileItems.length; i++) {
-        // Estrai il testo visibile (nome file + dimensione)
-        var rawText = fileItems[i].innerText || fileItems[i].textContent;
-        // Rimuovi il contenuto del tag <b> (la dimensione) e spazi superflui
-        var fileName = rawText.replace(/<b[^>]*>.*?<\/b>/gi, '').trim();
-        // Se il nome finisce con un'estensione immagine
+        // Ottieni il puro nome file dal nodo di testo prima del <b>
+        var fileName = "";
+        var child = fileItems[i].firstChild;
+        while (child) {
+            if (child.nodeType === 3) { // nodo di testo
+                fileName += child.nodeValue;
+            } else if (child.tagName === "B") {
+                break; // salta la dimensione
+            }
+            child = child.nextSibling;
+        }
+        fileName = fileName.trim();
         if (imageExtensions.test(fileName)) {
             thumbnailQueue.push(fileItems[i]);
         }
