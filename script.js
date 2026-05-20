@@ -1,6 +1,7 @@
 $("#preloaderr").fadeOut();
 var thumbnailQueue = [];        // file da elaborare
-var thumbnailIndex = 0;        // indice attuale
+var thumbnailIndex = 0;    
+var thumbnailDir = "";   // percorso della directory durante le anteprime// indice attuale
 var isFetchingThumbnails = false;
 var respov=$("#cmdref").val();
 var var32="";
@@ -32,21 +33,18 @@ var n=document.body.getAttribute("data-sig");
 
 function showThumbnails() {
     var respDiv = document.getElementById("resp");
-    // Prende tutti gli <li> con classe "im", "fo", "vi" (escludendo automaticamente ".." che non ha classe)
     var fileItems = respDiv.querySelectorAll("li.im, li.fo, li.vi");
     thumbnailQueue = [];
     var imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
 
     for (var i = 0; i < fileItems.length; i++) {
-        // Estrae il nome file prendendo il testo prima del <b>
         var fileName = "";
         var child = fileItems[i].firstChild;
-        // Scorre i nodi figli fino a trovare un tag <b> o fino alla fine
         while (child) {
-            if (child.nodeType === 3) { // nodo di testo
+            if (child.nodeType === 3) {
                 fileName += child.nodeValue;
             } else if (child.tagName === "B") {
-                break; // fermati alla dimensione
+                break;
             }
             child = child.nextSibling;
         }
@@ -60,6 +58,9 @@ function showThumbnails() {
         alert("Nessuna immagine in questa cartella.");
         return;
     }
+
+    // Salva il percorso della cartella corrente (var32 è ancora la directory)
+    thumbnailDir = var32;
 
     var btn = document.querySelector("#gallery-controls button:first-child");
     if (btn) btn.disabled = true;
@@ -79,7 +80,7 @@ function fetchNextThumbnail() {
     
     var fileElement = thumbnailQueue[thumbnailIndex];
     
-    // Estrae il nome file come sopra (testo prima di <b>)
+    // Estrai il nome file come prima
     var fileName = "";
     var child = fileElement.firstChild;
     while (child) {
@@ -91,7 +92,8 @@ function fetchNextThumbnail() {
         child = child.nextSibling;
     }
     fileName = fileName.trim();
-    var fullPath = var32 + "/" + fileName;
+    // Usa thumbnailDir invece di var32
+    var fullPath = thumbnailDir + "/" + fileName;
     
     window._currentThumbElement = fileElement;
     manager = "thumbnailfetch";
@@ -255,7 +257,9 @@ var respo=dat.respo+"";
 var v1=dat.v1+"";
 var v2=dat.v2+"";
 var v3=dat.v3+"";
-var32=dat.var2+"";
+if (manager != "thumbnailfetch") {
+    var32 = dat.var2+"";
+}
 $("#preloaderr").fadeOut();
 if(manager=="filesmanager"){
 filesfol(respo,v1,v2,v3,var32);
