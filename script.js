@@ -3,7 +3,8 @@ var thumbnailQueue = [];        // file da elaborare
 var thumbnailIndex = 0;    
 var pendingThumbIndex = -1;   // per gestire il timeout delle anteprime
 var thumbnailDir = "";   // percorso della directory durante le anteprime// indice attuale
-var THUMB_BATCH_SIZE = 100;   // dimensione del gruppo (solo per organizzazione visiva)
+var THUMB_BATCH_SIZE = 100;
+var thumbBatchActive = false;   // true se un batch è in corso   // dimensione del gruppo (solo per organizzazione visiva)
 var THUMB_TIMEOUT = 2000;     // timeout in millisecondi (2 secondi)
 var isFetchingThumbnails = false;
 var respov=$("#cmdref").val();
@@ -35,89 +36,99 @@ $("#navbar").css("display","none");
 var n=document.body.getAttribute("data-sig");
 
 function showThumbnails() {
-    var respDiv = document.getElementById("resp");
-    var fileItems = respDiv.querySelectorAll("li.im, li.fo, li.vi");
-    thumbnailQueue = [];
-    var imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
+    // Se un caricamento è già in corso, esci
+    if (thumbBatchActive) return;
 
-    for (var i = 0; i < fileItems.length; i++) {
-        var fileName = "";
-        var child = fileItems[i].firstChild;
-        while (child) {
-            if (child.nodeType === 3) {
-                fileName += child.nodeValue;
-            } else if (child.tagName === "B") {
-                break;
+    // Se la coda è vuota, costruiscila (solo la prima volta)
+    if (thumbnailQueue.length === 0) {
+        var respDiv = document.getElementById("resp");
+        var fileItems = respDiv.querySelectorAll("li.im, li.fo, li.vi");
+        var imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
+
+        for (var i = 0; i < fileItems.length; i++) {
+            var fileName = "";
+            var child = fileItems[i].firstChild;
+            while (child) {
+                if (child.nodeType === 3) fileName += child.nodeValue;
+                else if (child.tagName === "B") break;
+                child = child.nextSibling;
             }
-            child = child.nextSibling;
+            fileName = fileName.trim();
+            if (imageExtensions.test(fileName)) {
+                thumbnailQueue.push(fileItems[i]);
+            }
         }
-        fileName = fileName.trim();
-        if (imageExtensions.test(fileName)) {
-            thumbnailQueue.push(fileItems[i]);
+
+        if (thumbnailQueue.length === 0) {
+            alert("Nessuna immagine in questa cartella.");
+            return;
         }
+
+        thumbnailDir = var32;
+        thumbnailIndex = 0;
     }
 
-    if (thumbnailQueue.length === 0) {
-        alert("Nessuna immagine in questa cartella.");
+    // Se tutte le immagini sono già state caricate, avvisa
+    if (thumbnailIndex >= thumbnailQueue.length) {
+        alert("Tutte le anteprime sono già state caricate.");
         return;
     }
 
-    // Salva il percorso della cartella corrente (var32 è ancora la directory)
-    thumbnailDir = var32;
-
+    // Inizia un nuovo batch
+    thumbBatchActive = true;
     var btn = document.querySelector("#gallery-controls button:first-child");
     if (btn) btn.disabled = true;
-    isFetchingThumbnails = true;
-    thumbnailIndex = 0;
+
     fetchNextThumbnail();
 }
 
 function fetchNextThumbnail() {
-    // Se abbiamo finito la coda, termina
-    if (thumbnailIndex >= thumbnailQueue.length) {
-        isFetchingThumbnails = false;
+    // Se abbiamo raggiunto la fine del batch o della coda, fermati
+    if (thumbnailIndex >= thumbnailQueue.length || 
+        (thumbnailIndex > 0 && thumbnailIndex % THUMB_BATCH_SIZE === 0)) {
+        
+        thumbBatchActive = false;
         var btn = document.querySelector("#gallery-controls button:first-child");
-        if (btn) btn.disabled = false;
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = "Carica altre " + THUMB_BATCH_SIZE + " anteprime";
+        }
         $("#preloaderr").fadeOut();
-        document.getElementById("loadtxt").innerText = "";
+        document.getElementById("loadtxt").innerText = 
+            "Batch completato (" + thumbnailIndex + "/" + thumbnailQueue.length + ")";
         return;
     }
 
+    // Carica la prossima immagine
     var fileElement = thumbnailQueue[thumbnailIndex];
     var fileName = "";
     var child = fileElement.firstChild;
     while (child) {
-        if (child.nodeType === 3) {
-            fileName += child.nodeValue;
-        } else if (child.tagName === "B") {
-            break;
-        }
+        if (child.nodeType === 3) fileName += child.nodeValue;
+        else if (child.tagName === "B") break;
         child = child.nextSibling;
     }
     fileName = fileName.trim();
     var fullPath = thumbnailDir + "/" + fileName;
-
     window._currentThumbElement = fileElement;
     manager = "thumbnailfetch";
 
-    // Mostra loader
     $("#preloaderr").fadeIn();
-    document.getElementById("loadtxt").innerText = "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
+    document.getElementById("loadtxt").innerText = 
+        "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
 
-    // Invia il comando
     setdatcmd("cd", fullPath, "", respov);
 
-    // Timeout di sicurezza: se entro 2 secondi non arriva risposta, salta alla prossima
-    var currentIdx = thumbnailIndex;
+    // Timeout di sicurezza (1.5 secondi)
+    var idx = thumbnailIndex;
     setTimeout(function() {
-        // Controlla se siamo ancora in attesa dello stesso indice
-        if (manager === "thumbnailfetch" && currentIdx === thumbnailIndex && thumbnailIndex < thumbnailQueue.length) {
+        if (manager === "thumbnailfetch" && idx === thumbnailIndex && idx < thumbnailQueue.length) {
             console.warn("Timeout per " + fileName);
             $("#preloaderr").fadeOut();
             thumbnailIndex++;
             fetchNextThumbnail();
         }
-    }, 2000);
+    }, 1500);
 }
 
 function filesfol(respo, v1, v2, v3, var32) {
