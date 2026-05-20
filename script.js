@@ -36,10 +36,9 @@ $("#navbar").css("display","none");
 var n=document.body.getAttribute("data-sig");
 
 function showThumbnails() {
-    // Se un caricamento è già in corso, esci
-    if (thumbBatchActive) return;
+    if (thumbBatchActive) return; // evita doppio click
 
-    // Se la coda è vuota, costruiscila (solo la prima volta)
+    // Popola la coda solo la prima volta
     if (thumbnailQueue.length === 0) {
         var respDiv = document.getElementById("resp");
         var fileItems = respDiv.querySelectorAll("li.im, li.fo, li.vi");
@@ -68,13 +67,12 @@ function showThumbnails() {
         thumbnailIndex = 0;
     }
 
-    // Se tutte le immagini sono già state caricate, avvisa
+    // Avvia il caricamento solo se ci sono ancora immagini
     if (thumbnailIndex >= thumbnailQueue.length) {
         alert("Tutte le anteprime sono già state caricate.");
         return;
     }
 
-    // Inizia un nuovo batch
     thumbBatchActive = true;
     var btn = document.querySelector("#gallery-controls button:first-child");
     if (btn) btn.disabled = true;
@@ -83,10 +81,10 @@ function showThumbnails() {
 }
 
 function fetchNextThumbnail() {
-    // Se abbiamo raggiunto la fine del batch o della coda, fermati
+    // Fermati se abbiamo raggiunto la fine del batch O la fine della coda
     if (thumbnailIndex >= thumbnailQueue.length || 
         (thumbnailIndex > 0 && thumbnailIndex % THUMB_BATCH_SIZE === 0)) {
-        
+
         thumbBatchActive = false;
         var btn = document.querySelector("#gallery-controls button:first-child");
         if (btn) {
@@ -99,7 +97,6 @@ function fetchNextThumbnail() {
         return;
     }
 
-    // Carica la prossima immagine
     var fileElement = thumbnailQueue[thumbnailIndex];
     var fileName = "";
     var child = fileElement.firstChild;
@@ -128,7 +125,7 @@ function fetchNextThumbnail() {
             thumbnailIndex++;
             fetchNextThumbnail();
         }
-    }, 1500);
+    }, 2000);
 }
 
 function filesfol(respo, v1, v2, v3, var32) {
@@ -1122,6 +1119,16 @@ function downliio(o){
 window.open(o);
 }
 function hideThumbnails() {
+    // Resetta completamente lo stato delle anteprime
+    thumbnailQueue = [];
+    thumbnailIndex = 0;
+    thumbBatchActive = false;
+    pendingThumbIndex = -1;
+    var btn = document.querySelector("#gallery-controls button:first-child");
+    if (btn) {
+        btn.textContent = "Mostra anteprime immagini";
+        btn.disabled = false;
+    }
     // Ricarica la cartella corrente pulita
     setdatcmd("cd", var32, "", respov);
 }
