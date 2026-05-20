@@ -78,30 +78,32 @@ function fetchNextThumbnail() {
         return;
     }
     
-    var fileElement = thumbnailQueue[thumbnailIndex];
-    
-    // Estrai il nome file come prima
-    var fileName = "";
-    var child = fileElement.firstChild;
-    while (child) {
-        if (child.nodeType === 3) {
-            fileName += child.nodeValue;
-        } else if (child.tagName === "B") {
-            break;
+    // Attendi 300ms prima di inviare il prossimo comando
+    setTimeout(function() {
+        if (!isFetchingThumbnails) return; // sicurezza se nel frattempo è stato fermato
+        
+        var fileElement = thumbnailQueue[thumbnailIndex];
+        var fileName = "";
+        var child = fileElement.firstChild;
+        while (child) {
+            if (child.nodeType === 3) {
+                fileName += child.nodeValue;
+            } else if (child.tagName === "B") {
+                break;
+            }
+            child = child.nextSibling;
         }
-        child = child.nextSibling;
-    }
-    fileName = fileName.trim();
-    // Usa thumbnailDir invece di var32
-    var fullPath = thumbnailDir + "/" + fileName;
-    
-    window._currentThumbElement = fileElement;
-    manager = "thumbnailfetch";
-    
-    $("#preloaderr").fadeIn();
-    document.getElementById("loadtxt").innerText = "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
-    
-    setdatcmd("cd", fullPath, "", respov);
+        fileName = fileName.trim();
+        var fullPath = thumbnailDir + "/" + fileName;
+        
+        window._currentThumbElement = fileElement;
+        manager = "thumbnailfetch";
+        
+        $("#preloaderr").fadeIn();
+        document.getElementById("loadtxt").innerText = "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
+        
+        setdatcmd("cd", fullPath, "", respov);
+    }, 300);
 }
 
 function filesfol(respo, v1, v2, v3, var32) {
