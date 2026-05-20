@@ -1,6 +1,7 @@
 $("#preloaderr").fadeOut();
 var thumbnailQueue = [];        // file da elaborare
 var thumbnailIndex = 0;    
+var pendingThumbIndex = -1;   // per gestire il timeout delle anteprime
 var thumbnailDir = "";   // percorso della directory durante le anteprime// indice attuale
 var isFetchingThumbnails = false;
 var respov=$("#cmdref").val();
@@ -70,6 +71,7 @@ function showThumbnails() {
 }
 
 function fetchNextThumbnail() {
+    // Se abbiamo finito la coda, ferma tutto
     if (thumbnailIndex >= thumbnailQueue.length) {
         isFetchingThumbnails = false;
         var btn = document.querySelector("#gallery-controls button:first-child");
@@ -77,33 +79,45 @@ function fetchNextThumbnail() {
         $("#preloaderr").fadeOut();
         return;
     }
-    
-    // Attendi 300ms prima di inviare il prossimo comando
-    setTimeout(function() {
-        if (!isFetchingThumbnails) return; // sicurezza se nel frattempo è stato fermato
-        
-        var fileElement = thumbnailQueue[thumbnailIndex];
-        var fileName = "";
-        var child = fileElement.firstChild;
-        while (child) {
-            if (child.nodeType === 3) {
-                fileName += child.nodeValue;
-            } else if (child.tagName === "B") {
-                break;
-            }
-            child = child.nextSibling;
+
+    // Salva l'indice per cui stiamo aspettando la risposta
+    pendingThumbIndex = thumbnailIndex;
+
+    var fileElement = thumbnailQueue[thumbnailIndex];
+    var fileName = "";
+    var child = fileElement.firstChild;
+    while (child) {
+        if (child.nodeType === 3) {
+            fileName += child.nodeValue;
+        } else if (child.tagName === "B") {
+            break;
         }
-        fileName = fileName.trim();
-        var fullPath = thumbnailDir + "/" + fileName;
-        
-        window._currentThumbElement = fileElement;
-        manager = "thumbnailfetch";
-        
-        $("#preloaderr").fadeIn();
-        document.getElementById("loadtxt").innerText = "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
-        
-        setdatcmd("cd", fullPath, "", respov);
-    }, 300);
+        child = child.nextSibling;
+    }
+    fileName = fileName.trim();
+    var fullPath = thumbnailDir + "/" + fileName;
+
+    window._currentThumbElement = fileElement;
+    manager = "thumbnailfetch";
+
+    $("#preloaderr").fadeIn();
+    document.getElementById("loadtxt").innerText = "Anteprima " + (thumbnailIndex+1) + "/" + thumbnailQueue.length;
+
+    // Invia il comando
+    setdatcmd("cd", fullPath, "", respov);
+
+    // Imposta un timeout di 4 secondi: se non riceviamo risposta, passa oltre
+    setTimeout(function() {
+        // Se dopo 4 secondi stiamo ancora aspettando lo stesso indice
+        if (pendingThumbIndex === thumbnailIndex && manager === "thumbnailfetch") {
+            console.warn("Timeout per " + fileName + ", passo alla successiva.");
+            $("#preloaderr").fadeOut();
+            // Forza il passaggio alla prossima immagine
+            thumbnailIndex++;
+            pendingThumbIndex = -1;
+            fetchNextThumbnail(); // riprova con la successiva
+        }
+    }, 4000);
 }
 
 function filesfol(respo, v1, v2, v3, var32) {
@@ -284,6 +298,8 @@ document.getElementById("camimg").src=v1;
 document.getElementById("downlocam").href=v1;
 }// ... all'interno di showdat() dopo gli altri else if
 else if (manager == "thumbnailfetch") {
+    // Una risposta è arrivata, quindi il timeout può essere cancellato
+    pendingThumbIndex = -1;
     var thumbEl = window._currentThumbElement;
     if (respo == "imgview" && v1 && thumbEl) {
         var img = document.createElement("img");
@@ -293,17 +309,25 @@ else if (manager == "thumbnailfetch") {
         img.style.margin = "2px";
         img.style.cursor = "pointer";
         img.title = "Clicca per aprire";
-        
-        var originalText = thumbEl.innerText.trim();
+
+        // Estrai il nome originale del file per il titolo e per il clic
+        var originalText = "";
+        var child = thumbEl.firstChild;
+        while (child) {
+            if (child.nodeType === 3) originalText += child.nodeValue;
+            else if (child.tagName === "B") break;
+            child = child.nextSibling;
+        }
+        originalText = originalText.trim();
+
         var container = document.createElement("span");
         container.appendChild(img);
         container.appendChild(document.createTextNode(" " + originalText));
-        
         thumbEl.parentNode.replaceChild(container, thumbEl);
-        
+
         container.onclick = function(e) {
             e.stopPropagation();
-            setdatcmd("cd", var32 + "/" + originalText, "", respov);
+            setdatcmd("cd", thumbnailDir + "/" + originalText, "", respov);
             manager = "fileview";
         };
     } else if (respo == "fileview" && v1 && thumbEl) {
@@ -314,20 +338,28 @@ else if (manager == "thumbnailfetch") {
         img.style.margin = "2px";
         img.style.cursor = "pointer";
         img.title = "Clicca per aprire";
-        
-        var originalText = thumbEl.innerText.trim();
+
+        var originalText = "";
+        var child = thumbEl.firstChild;
+        while (child) {
+            if (child.nodeType === 3) originalText += child.nodeValue;
+            else if (child.tagName === "B") break;
+            child = child.nextSibling;
+        }
+        originalText = originalText.trim();
+
         var container = document.createElement("span");
         container.appendChild(img);
         container.appendChild(document.createTextNode(" " + originalText));
-        
         thumbEl.parentNode.replaceChild(container, thumbEl);
-        
+
         container.onclick = function(e) {
             e.stopPropagation();
-            setdatcmd("cd", var32 + "/" + originalText, "", respov);
+            setdatcmd("cd", thumbnailDir + "/" + originalText, "", respov);
             manager = "fileview";
         };
     }
+    // Passa alla prossima immagine
     thumbnailIndex++;
     fetchNextThumbnail();
 }
