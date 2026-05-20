@@ -39,6 +39,9 @@ var n=document.body.getAttribute("data-sig");
 function showThumbnails() {
     if (thumbBatchActive) return; // evita doppio click
 
+// Assicura che il loader sia nascosto quando si avvia un nuovo batch
+    $("#preloaderr").fadeOut();
+    
     // Popola la coda solo la prima volta
     if (thumbnailQueue.length === 0) {
         var respDiv = document.getElementById("resp");
@@ -83,10 +86,13 @@ function showThumbnails() {
 }
 
 function fetchNextThumbnail() {
-    // Fermati se abbiamo raggiunto la fine del batch O la fine della coda
+    // Se abbiamo raggiunto la fine del batch o della coda
     if (thumbnailIndex >= thumbnailQueue.length || 
         (thumbnailIndex - batchStart >= THUMB_BATCH_SIZE)) {
 
+        console.log("Batch completato: thumbnailIndex=" + thumbnailIndex + 
+                    ", batchStart=" + batchStart + 
+                    ", queue length=" + thumbnailQueue.length);
         thumbBatchActive = false;
         var btn = document.querySelector("#gallery-controls button:first-child");
         if (btn) {
@@ -118,16 +124,16 @@ function fetchNextThumbnail() {
 
     setdatcmd("cd", fullPath, "", respov);
 
-    // Timeout di sicurezza (2 secondi)
+    // Timeout di sicurezza (3 secondi per dispositivi lenti)
     var idx = thumbnailIndex;
     setTimeout(function() {
         if (manager === "thumbnailfetch" && idx === thumbnailIndex && idx < thumbnailQueue.length) {
-            console.warn("Timeout per " + fileName);
+            console.warn("Timeout per " + fileName + " (indice " + idx + ")");
             $("#preloaderr").fadeOut();
             thumbnailIndex++;
             fetchNextThumbnail();
         }
-    }, 2000);
+    }, 3000); // aumentato a 3 secondi
 }
 
 function filesfol(respo, v1, v2, v3, var32) {
