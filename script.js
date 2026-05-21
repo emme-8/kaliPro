@@ -39,7 +39,6 @@ var n=document.body.getAttribute("data-sig");
 function showThumbnails() {
     if (thumbBatchActive) return; // evita doppio click
 
-    // Assicura che il loader sia nascosto quando si avvia un nuovo batch
     $("#preloaderr").fadeOut();
     
     // Popola la coda solo la prima volta
@@ -69,8 +68,10 @@ function showThumbnails() {
 
         thumbnailDir = var32;
         thumbnailIndex = 0;
+    }
 
-        // INVERTI L'ORDINE DELLA CODA (dall'ultimo file al primo)
+    // INVERTI L'ORDINE DELLA CODA SOLO QUANDO SIAMO ALL'INIZIO DEL CARICAMENTO
+    if (thumbnailIndex === 0) {
         thumbnailQueue.reverse();
     }
 
@@ -81,7 +82,7 @@ function showThumbnails() {
     }
 
     thumbBatchActive = true;
-    batchStart = thumbnailIndex; // ricorda l'indice di partenza del batch
+    batchStart = thumbnailIndex;
     var btn = document.querySelector("#gallery-controls button:first-child");
     if (btn) btn.disabled = true;
 
