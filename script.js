@@ -3,7 +3,7 @@ var thumbnailQueue = [];        // file da elaborare
 var thumbnailIndex = 0;    
 var pendingThumbIndex = -1;   // per gestire il timeout delle anteprime
 var thumbnailDir = "";   // percorso della directory durante le anteprime// indice attuale
-var THUMB_BATCH_SIZE = 1000;
+var THUMB_BATCH_SIZE = 500;
 var thumbBatchActive = false;   // true se un batch è in corso   // dimensione del gruppo (solo per organizzazione visiva)
 var THUMB_TIMEOUT = 2000;     // timeout in millisecondi (2 secondi)
 var isFetchingThumbnails = false;
@@ -39,7 +39,7 @@ var n=document.body.getAttribute("data-sig");
 function showThumbnails() {
     if (thumbBatchActive) return; // evita doppio click
 
-// Assicura che il loader sia nascosto quando si avvia un nuovo batch
+    // Assicura che il loader sia nascosto quando si avvia un nuovo batch
     $("#preloaderr").fadeOut();
     
     // Popola la coda solo la prima volta
@@ -69,6 +69,9 @@ function showThumbnails() {
 
         thumbnailDir = var32;
         thumbnailIndex = 0;
+
+        // INVERTI L'ORDINE DELLA CODA (dall'ultimo file al primo)
+        thumbnailQueue.reverse();
     }
 
     // Avvia il caricamento solo se ci sono ancora immagini
