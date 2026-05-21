@@ -37,11 +37,11 @@ $("#navbar").css("display","none");
 var n=document.body.getAttribute("data-sig");
 
 function showThumbnails() {
-    if (thumbBatchActive) return; // evita doppio click
+    if (thumbBatchActive) return;
 
     $("#preloaderr").fadeOut();
-    
-    // Popola la coda solo la prima volta
+
+    // Se la coda è vuota, popola
     if (thumbnailQueue.length === 0) {
         var respDiv = document.getElementById("resp");
         var fileItems = respDiv.querySelectorAll("li.im, li.fo, li.vi");
@@ -70,12 +70,12 @@ function showThumbnails() {
         thumbnailIndex = 0;
     }
 
-    // INVERTI L'ORDINE DELLA CODA SOLO QUANDO SIAMO ALL'INIZIO DEL CARICAMENTO
+    // INVERTI L'ORDINE OGNI VOLTA CHE SI PARTE DA ZERO (nuovo ciclo)
     if (thumbnailIndex === 0) {
         thumbnailQueue.reverse();
+        console.log("Coda invertita. Primo elemento ora:", thumbnailQueue[0]?.innerText);
     }
 
-    // Avvia il caricamento solo se ci sono ancora immagini
     if (thumbnailIndex >= thumbnailQueue.length) {
         alert("Tutte le anteprime sono già state caricate.");
         return;
