@@ -136,7 +136,7 @@ function fetchNextThumbnail() {
             thumbnailIndex++;
             fetchNextThumbnail();
         }
-    }, 3000);
+    }, 5000);
 }
 
 function filesfol(respo, v1, v2, v3, var32) {
