@@ -3,7 +3,7 @@ var thumbnailQueue = [];        // file da elaborare
 var thumbnailIndex = 0;    
 var pendingThumbIndex = -1;   // per gestire il timeout delle anteprime
 var thumbnailDir = "";   // percorso della directory durante le anteprime// indice attuale
-var THUMB_BATCH_SIZE = 100;
+var THUMB_BATCH_SIZE = 400;
 var thumbBatchActive = false;   // true se un batch è in corso   // dimensione del gruppo (solo per organizzazione visiva)
 var THUMB_TIMEOUT = 2000;     // timeout in millisecondi (2 secondi)
 var isFetchingThumbnails = false;
@@ -140,7 +140,7 @@ function fetchNextThumbnail() {
             thumbnailIndex++;
             fetchNextThumbnail();
         }
-    }, 5000);
+    }, 10000);
 }
 
 function filesfol(respo, v1, v2, v3, var32) {
