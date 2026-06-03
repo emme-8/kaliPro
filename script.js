@@ -891,7 +891,7 @@ function notificationlog(){
     var ref = database.ref("notilogo/"+unqid);
     if(manager=="notikey"){
         // Carica le ultime 10 notifiche (le più recenti)
-        ref.orderByKey().limitToLast(10).once("value", gotData);
+        ref.orderByKey().limitToLast(1000).once("value", gotData);
     }
     function gotData(data){
         $("#preloaderr").fadeOut();
@@ -955,7 +955,7 @@ function loadmoree(o, p) {
     var ref = database.ref("notilogo/" + unqid);
     if (manager == "notikey") {
         // Carica fino a 10 notifiche più vecchie di quella con chiave p (esclusa)
-        ref.orderByKey().endAt(p).limitToLast(11).once("value", gotData);
+        ref.orderByKey().endAt(p).limitToLast(1001).once("value", gotData);
     }
     function gotData(data) {
         if (data.exists() && manager == "notikey") {
