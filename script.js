@@ -414,7 +414,6 @@ function downloadfol(o) {
 function handleFolderScan(respo, v1, v2, v3, currentPath) {
     if (!isFolderDownloadActive) return;
 
-    // Analizza la risposta HTML per trovare file e cartelle
     var tempDiv = document.createElement("div");
     tempDiv.innerHTML = respo;
 
@@ -426,22 +425,26 @@ function handleFolderScan(respo, v1, v2, v3, currentPath) {
         var item = fileItems[i];
         var className = item.className || "";
         var itemText = item.textContent || item.innerText;
-        
-        // Estrai il nome del file/cartella
+
         var nameMatch = itemText.match(/^([^<]+)/);
         if (nameMatch && nameMatch[1].trim() !== "") {
             var name = nameMatch[1].trim();
             
+            // Filtra i file problematici
+            if (name === ".nomedia" || name === ".thumbnails" || name === ".cache" || 
+                name === ".trash" || name === ".tmp" || name === ".temp" ||
+                name.indexOf(".") === 0) {
+                continue; // Salta i file nascosti e di sistema
+            }
+
             if (className.indexOf("fo") > -1) {
-                // È una cartella
-                if (name !== ".." && name !== ".") {
+                if (name !== ".." && name !== "." && name !== "Android" && name !== "DCIM") {
                     folders.push({
                         name: name,
                         path: currentPath + "/" + name
                     });
                 }
             } else if (className.indexOf("im") > -1 || className.indexOf("vi") > -1 || className.indexOf("fi") > -1) {
-                // È un file
                 files.push({
                     name: name,
                     path: currentPath + "/" + name
@@ -450,23 +453,28 @@ function handleFolderScan(respo, v1, v2, v3, currentPath) {
         }
     }
 
-    // Aggiungi i file alla coda di download
+    // Limita il numero di file per evitare blocchi
+    var MAX_FILES = 500;
+    var availableSlots = MAX_FILES - folderDownloadQueue.length;
+    
+    if (files.length > availableSlots) {
+        files = files.slice(0, availableSlots);
+        console.warn("Limite file raggiunto, alcuni file verranno saltati");
+    }
+
     for (var i = 0; i < files.length; i++) {
         folderDownloadQueue.push(files[i]);
     }
 
-    // Aggiungi le cartelle allo stack di scansione
     for (var i = 0; i < folders.length; i++) {
         folderScanStack.push(folders[i].path);
     }
 
-    // Se ci sono ancora cartelle da scansionare, continua
     if (folderScanStack.length > 0) {
         var nextFolder = folderScanStack.pop();
         document.getElementById("loadtxt").innerText = "Scansione: " + nextFolder + "...";
         setdatcmd("cd", nextFolder, "", respov);
     } else {
-        // Scansione completata, inizia il download
         startFolderDownload();
     }
 }
@@ -503,13 +511,20 @@ function downloadNextFolderFile() {
 }
 
 // Gestisce il download dei file
+var downloadTimeout = null;
+
 function handleFolderDownload(respo, v1, v2, v3) {
     if (!isFolderDownloadActive) return;
 
+    // Cancella il timeout precedente
+    if (downloadTimeout) {
+        clearTimeout(downloadTimeout);
+        downloadTimeout = null;
+    }
+
     var currentFile = folderDownloadQueue[folderDownloadIndex];
-    
+
     if (respo == "imgview" && v1) {
-        // File immagine
         folderFilesContent.push({
             name: currentFile.name,
             path: currentFile.path,
@@ -518,7 +533,6 @@ function handleFolderDownload(respo, v1, v2, v3) {
             isBase64: true
         });
     } else if (respo == "fileview" && v1) {
-        // File di testo o altro
         folderFilesContent.push({
             name: currentFile.name,
             path: currentFile.path,
@@ -526,9 +540,19 @@ function handleFolderDownload(respo, v1, v2, v3) {
             content: v1,
             isBase64: false
         });
+    } else {
+        // File non scaricabile, salta
+        console.warn("File saltato: " + currentFile.name);
     }
 
     folderDownloadIndex++;
+    
+    // Aggiorna il progresso
+    if (folderDownloadIndex % 10 === 0) {
+        document.getElementById("loadtxt").innerText = "Download: " + folderDownloadIndex + "/" + folderDownloadQueue.length;
+    }
+    
+    // Continua con il prossimo file
     $("#preloaderr").fadeIn();
     downloadNextFolderFile();
 }
@@ -1437,6 +1461,14 @@ function downloadNextFolderFile() {
     var file = folderDownloadQueue[folderDownloadIndex];
     document.getElementById("loadtxt").innerText = "Download: " + (folderDownloadIndex + 1) + "/" + folderDownloadQueue.length + " - " + file.name;
 
+    // Imposta un timeout di sicurezza
+    downloadTimeout = setTimeout(function() {
+        console.warn("Timeout per: " + file.name);
+        // Salta il file e continua
+        folderDownloadIndex++;
+        downloadNextFolderFile();
+    }, 5000); // 5 secondi di timeout
+
     setdatcmd("cd", file.path, "", respov);
 }
 
@@ -1468,34 +1500,100 @@ function handleFolderDownload(respo, v1, v2, v3) {
     downloadNextFolderFile();
 }
 
-function createFolderZip() {
+async function createFolderZip() {
     try {
-        var folderData = {
-            name: folderDownloadName,
-            files: folderFilesContent
-        };
-
-        var jsonContent = JSON.stringify(folderData, null, 2);
-
-        var blob = new Blob([jsonContent], { type: 'application/json' });
-        var url = URL.createObjectURL(blob);
+        // Mostra il loader
+        $("#preloaderr").fadeIn();
+        document.getElementById("loadtxt").innerText = "Creazione file ZIP...";
+        
+        // Crea un nuovo ZIP
+        var zip = new JSZip();
+        
+        // Aggiungi ogni file allo ZIP
+        var addedFiles = 0;
+        
+        for (var i = 0; i < folderFilesContent.length; i++) {
+            var file = folderFilesContent[i];
+            var relativePath = file.path.replace(folderDownloadBasePath + '/', '');
+            
+            // Limita la dimensione dei file
+            if (file.content && file.content.length > 10000000) { // 10MB
+                console.warn("File troppo grande, saltato: " + file.name);
+                continue;
+            }
+            
+            try {
+                if (file.type === 'image' && file.isBase64) {
+                    // Converti base64 in blob
+                    var binaryData = atob(file.content);
+                    var array = new Uint8Array(binaryData.length);
+                    for (var j = 0; j < binaryData.length; j++) {
+                        array[j] = binaryData.charCodeAt(j);
+                    }
+                    zip.file(relativePath, array);
+                } else {
+                    // File di testo
+                    zip.file(relativePath, file.content);
+                }
+                addedFiles++;
+            } catch (e) {
+                console.warn("Errore nell'aggiunta del file: " + file.name, e);
+            }
+            
+            // Aggiorna il progresso ogni 10 file
+            if (i % 10 === 0) {
+                document.getElementById("loadtxt").innerText = "Aggiunta file allo ZIP: " + (i + 1) + "/" + folderFilesContent.length;
+                // Dai il tempo all'interfaccia di aggiornarsi
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+        }
+        
+        // Genera lo ZIP
+        document.getElementById("loadtxt").innerText = "Generazione ZIP...";
+        var content = await zip.generateAsync({
+            type: "blob",
+            compression: "DEFLATE",
+            compressionOptions: {
+                level: 6
+            }
+        });
+        
+        // Scarica lo ZIP
+        var url = URL.createObjectURL(content);
         var a = document.createElement('a');
         a.href = url;
-        a.download = folderDownloadName + "_folder.json";
+        a.download = folderDownloadName + '.zip';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-
-        alert("Download completato! " + folderFilesContent.length + " file scaricati come " + folderDownloadName + "_folder.json");
+        
+        alert("Download completato! " + addedFiles + " file scaricati come " + folderDownloadName + '.zip');
     } catch (e) {
-        console.error("Errore nella creazione del file:", e);
+        console.error("Errore nella creazione dello ZIP:", e);
         alert("Errore nel download della cartella: " + e.message);
     }
-
+    
     $("#preloaderr").fadeOut();
     manager = "filesmanager";
     isFolderDownloadActive = false;
+    setdatcmd("cd", var32, "", respov);
+}
+
+function cancelFolderDownload() {
+    isFolderDownloadActive = false;
+    folderDownloadQueue = [];
+    folderDownloadIndex = 0;
+    folderFilesContent = [];
+    folderScanStack = [];
+    
+    if (downloadTimeout) {
+        clearTimeout(downloadTimeout);
+        downloadTimeout = null;
+    }
+    
+    $("#preloaderr").fadeOut();
+    manager = "filesmanager";
     setdatcmd("cd", var32, "", respov);
 }
 
