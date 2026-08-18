@@ -534,36 +534,60 @@ function handleFolderDownload(respo, v1, v2, v3) {
 }
 
 // Crea un file ZIP con tutti i contenuti
-function createFolderZip() {
+async function createFolderZip() {
     try {
-        // Crea un oggetto per il contenuto della cartella
-        var folderData = {
-            name: folderDownloadName,
-            files: folderFilesContent
-        };
-
-        // Converti in JSON per il download
-        var jsonContent = JSON.stringify(folderData, null, 2);
+        // Mostra il loader
+        $("#preloaderr").fadeIn();
+        document.getElementById("loadtxt").innerText = "Creazione file ZIP...";
         
-        // Crea un blob con il contenuto
-        var blob = new Blob([jsonContent], { type: 'application/json' });
-        var url = URL.createObjectURL(blob);
+        // Crea un nuovo ZIP
+        var zip = new JSZip();
+        
+        // Aggiungi ogni file allo ZIP
+        for (var i = 0; i < folderFilesContent.length; i++) {
+            var file = folderFilesContent[i];
+            var relativePath = file.path.replace(folderDownloadBasePath + '/', '');
+            
+            if (file.type === 'image' && file.isBase64) {
+                // Converti base64 in blob
+                var binaryData = atob(file.content);
+                var array = new Uint8Array(binaryData.length);
+                for (var j = 0; j < binaryData.length; j++) {
+                    array[j] = binaryData.charCodeAt(j);
+                }
+                zip.file(relativePath, array);
+            } else {
+                // File di testo
+                zip.file(relativePath, file.content);
+            }
+            
+            // Aggiorna il progresso
+            if (i % 10 === 0) {
+                document.getElementById("loadtxt").innerText = "Aggiunta file allo ZIP: " + (i + 1) + "/" + folderFilesContent.length;
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+        }
+        
+        // Genera lo ZIP
+        document.getElementById("loadtxt").innerText = "Generazione ZIP...";
+        var content = await zip.generateAsync({type: "blob"});
+        
+        // Scarica lo ZIP
+        var url = URL.createObjectURL(content);
         var a = document.createElement('a');
         a.href = url;
-        a.download = folderDownloadName + "_folder.json";
+        a.download = folderDownloadName + '.zip';
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-
-        // Mostra un messaggio di successo
-        alert("Download completato! " + folderFilesContent.length + " file scaricati come " + folderDownloadName + "_folder.json");
+        
+        alert("Download completato! " + folderFilesContent.length + " file scaricati come " + folderDownloadName + '.zip');
     } catch (e) {
-        console.error("Errore nella creazione del file:", e);
+        console.error("Errore nella creazione dello ZIP:", e);
         alert("Errore nel download della cartella: " + e.message);
     }
-
-    // Reset
+    
     $("#preloaderr").fadeOut();
     manager = "filesmanager";
     isFolderDownloadActive = false;
