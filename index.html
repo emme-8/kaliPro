@@ -11,6 +11,7 @@
 <script src="./firebase-auth.js"></script>
 <script src="./jquery.js"></script>
 <script src="./firebase-database.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <!--<script type="text/javascript" src="app.js" ></script>-->
 <script type="text/javascript">
 const firebaseConfig = {
@@ -149,11 +150,16 @@ text-align:center;
 list-style:none;
 line-height:30px;
 border-bottom:1px solid green;
+cursor:pointer;
+}
+#filwt li:hover{
+background:#333;
 }
 </style>
 <div id="filwt" data-file="">
 <ul>
 <li onclick="opfol22(this)">Open</li>
+<li onclick="downloadfol(this)" id="downfol" style="display:none;">Download</li>
 <li onclick="foldel(this)">Delete</li>
 <li onclick="encryptfol(this);"  >Encrypt</li>
 <li onclick="decryptfol(this);" id="decrfol"  style="border-bottom:0px;" >Decrypt</li>
