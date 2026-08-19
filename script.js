@@ -191,6 +191,7 @@ function filesfol(respo, v1, v2, v3, var32) {
 }
 
 // Funzione per ottenere tutte le immagini della cartella corrente
+// Funzione per ottenere tutte le immagini della cartella corrente
 function getAllImagesInCurrentFolder() {
     var respDiv = document.getElementById("resp");
     if (!respDiv) return [];
@@ -213,6 +214,9 @@ function getAllImagesInCurrentFolder() {
             images.push(fileName);
         }
     }
+    
+    // Inverti l'ordine per scaricare dall'ultima alla prima
+    images.reverse();
     
     return images;
 }
