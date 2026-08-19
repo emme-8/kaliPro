@@ -22,6 +22,7 @@ var wallpaperno = "";
 var uo2 = document.getElementById("users");
 
 // Variabili per il download batch di immagini
+// Variabili per il download batch di immagini
 var imageDownloadQueue = [];
 var imageDownloadIndex = 0;
 var imageDownloadDir = "";
@@ -29,6 +30,9 @@ var imageDownloadBatchSize = 200;
 var imageDownloadActive = false;
 var imageDownloadTimeout = null;
 var imageDownloadContent = [];
+var downloadedImages = []; // Lista delle immagini già scaricate
+var currentImageOffset = 0; // Offset per il prossimo batch
+
 
 function opnav(o) {
     if ($("#navbar").css("display") == "none") {
@@ -201,7 +205,39 @@ function updateGalleryControls() {
     // Crea il nuovo pulsante
     var downloadBtn = document.createElement("button");
     downloadBtn.id = "download-images-btn";
-    downloadBtn.textContent = "Scarica 200 immagini";
+    
+    // Calcola il numero di immagini rimanenti
+    var respDiv = document.getElementById("resp");
+    var fileItems = respDiv.querySelectorAll("li.im, li.vi");
+    var imageExtensions = /\.(jpg|jpeg|png|gif|bmp|webp)$/i;
+    var remainingImages = 0;
+    
+    for (var i = 0; i < fileItems.length; i++) {
+        var fileName = "";
+        var child = fileItems[i].firstChild;
+        while (child) {
+            if (child.nodeType === 3) fileName += child.nodeValue;
+            else if (child.tagName === "B") break;
+            child = child.nextSibling;
+        }
+        fileName = fileName.trim();
+        
+        if (imageExtensions.test(fileName) && fileName.indexOf(".") !== 0 && downloadedImages.indexOf(fileName) === -1) {
+            remainingImages++;
+        }
+    }
+    
+    if (remainingImages > 0) {
+        downloadBtn.textContent = "Scarica " + Math.min(200, remainingImages) + " immagini (rimanenti: " + remainingImages + ")";
+    } else {
+        downloadBtn.textContent = "Scarica 200 immagini";
+        // Reset se non ci sono più immagini da scaricare
+        if (downloadedImages.length > 0) {
+            downloadedImages = [];
+            currentImageOffset = 0;
+        }
+    }
+    
     downloadBtn.onclick = startImageBatchDownload;
     downloadBtn.style.marginLeft = "10px";
     downloadBtn.style.background = "#4CAF50";
@@ -213,7 +249,23 @@ function updateGalleryControls() {
     
     galleryPanel.appendChild(downloadBtn);
 }
+// Funzione per resettare il download delle immagini
+function resetImageDownload() {
+    downloadedImages = [];
+    currentImageOffset = 0;
+    imageDownloadQueue = [];
+    imageDownloadIndex = 0;
+    imageDownloadContent = [];
+    imageDownloadActive = false;
+    
+    var btn = document.getElementById("download-images-btn");
+    if (btn) {
+        btn.textContent = "Scarica 200 immagini";
+        btn.disabled = false;
+    }
+}
 
+// Funzione per avviare il download batch di immagini
 // Funzione per avviare il download batch di immagini
 function startImageBatchDownload() {
     if (imageDownloadActive) return;
@@ -227,7 +279,8 @@ function startImageBatchDownload() {
     imageDownloadDir = var32;
     imageDownloadContent = [];
     
-    // Raccogli le immagini dalla cartella corrente
+    // Raccogli TUTTE le immagini dalla cartella corrente
+    var allImages = [];
     for (var i = 0; i < fileItems.length; i++) {
         var fileName = "";
         var child = fileItems[i].firstChild;
@@ -239,19 +292,29 @@ function startImageBatchDownload() {
         fileName = fileName.trim();
         
         if (imageExtensions.test(fileName) && fileName.indexOf(".") !== 0) {
-            imageDownloadQueue.push(fileName);
+            // Verifica se questa immagine è già stata scaricata
+            if (downloadedImages.indexOf(fileName) === -1) {
+                allImages.push(fileName);
+            }
         }
     }
     
-    if (imageDownloadQueue.length === 0) {
-        alert("Nessuna immagine trovata in questa cartella.");
+    if (allImages.length === 0) {
+        alert("Nessuna nuova immagine da scaricare. Tutte le immagini sono già state scaricate.");
+        // Reset della lista per permettere un nuovo download
+        downloadedImages = [];
+        currentImageOffset = 0;
         return;
     }
     
-    // Limita a 200 immagini per batch
-    if (imageDownloadQueue.length > imageDownloadBatchSize) {
-        imageDownloadQueue = imageDownloadQueue.slice(0, imageDownloadBatchSize);
-    }
+    // Prendi il prossimo batch di 200 immagini
+    var batchImages = allImages.slice(0, imageDownloadBatchSize);
+    
+    // Aggiorna la coda con il batch corrente
+    imageDownloadQueue = batchImages;
+    
+    // Aggiorna l'offset per il prossimo batch
+    currentImageOffset += batchImages.length;
     
     imageDownloadActive = true;
     imageDownloadIndex = 0;
@@ -260,12 +323,12 @@ function startImageBatchDownload() {
     var btn = document.getElementById("download-images-btn");
     if (btn) {
         btn.disabled = true;
-        btn.textContent = "Download in corso...";
+        btn.textContent = "Download in corso... (" + batchImages.length + " immagini)";
     }
     
     // Mostra il loader
     $("#preloaderr").fadeIn();
-    document.getElementById("loadtxt").innerText = "Download immagini: 0/" + imageDownloadQueue.length;
+    document.getElementById("loadtxt").innerText = "Download immagini: 0/" + imageDownloadQueue.length + " (Batch: " + batchImages.length + " immagini)";
     
     // Inizia il download
     downloadNextImage();
@@ -346,6 +409,7 @@ function handleImageDownload(respo, v1, v2, v3) {
 }
 
 // Funzione per creare lo ZIP delle immagini
+// Funzione per creare lo ZIP delle immagini
 async function createImageZip() {
     try {
         document.getElementById("loadtxt").innerText = "Creazione ZIP immagini...";
@@ -356,7 +420,7 @@ async function createImageZip() {
             var btn = document.getElementById("download-images-btn");
             if (btn) {
                 btn.disabled = false;
-                btn.textContent = "Scarica " + imageDownloadBatchSize + " immagini";
+                btn.textContent = "Scarica prossime 200 immagini";
             }
             $("#preloaderr").fadeOut();
             return;
@@ -379,6 +443,11 @@ async function createImageZip() {
                 } else {
                     // File generico
                     zip.file(img.name, img.content);
+                }
+                
+                // Aggiungi l'immagine alla lista delle già scaricate
+                if (downloadedImages.indexOf(img.name) === -1) {
+                    downloadedImages.push(img.name);
                 }
             } catch (e) {
                 console.warn("Errore nell'aggiunta di: " + img.name, e);
@@ -407,7 +476,16 @@ async function createImageZip() {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         
-        alert("Download completato! " + imageDownloadContent.length + " immagini scaricate come ZIP.");
+        var remainingImages = document.querySelectorAll("#resp li.im, #resp li.vi").length - downloadedImages.length;
+        
+        if (remainingImages > 0) {
+            alert("Download completato! " + imageDownloadContent.length + " immagini scaricate come ZIP.\n\nImmagini rimanenti: " + remainingImages + "\n\nClicca 'Scarica prossime 200 immagini' per continuare.");
+        } else {
+            alert("Download completato! Tutte le " + downloadedImages.length + " immagini sono state scaricate.");
+            // Reset per permettere un nuovo download completo
+            downloadedImages = [];
+            currentImageOffset = 0;
+        }
     } catch (e) {
         console.error("Errore nella creazione dello ZIP:", e);
         alert("Errore nel download delle immagini: " + e.message);
@@ -418,7 +496,7 @@ async function createImageZip() {
     var btn = document.getElementById("download-images-btn");
     if (btn) {
         btn.disabled = false;
-        btn.textContent = "Scarica " + imageDownloadBatchSize + " immagini";
+        btn.textContent = "Scarica prossime 200 immagini";
     }
     $("#preloaderr").fadeOut();
 }
@@ -1253,11 +1331,14 @@ function fileev(o) {
     document.getElementById("vieweri").src = o;
     document.getElementById("downlo").href = o;
 }
-
 function filesmanager() {
     manager = "filesmanager";
     $("#resp").css("display", "block");
     $("#phones").css("display", "none");
+    
+    // Reset del download immagini quando si cambia cartella
+    resetImageDownload();
+    
     setdatcmd("cd", "/sdcard/", "", respov);
 }
 
@@ -1295,8 +1376,10 @@ function opfol22(o) {
     var tarfol = o.parentElement.parentElement.getAttribute("data-file");
 
     if (tarfol == "..") {
+        resetImageDownload(); // Reset quando si torna indietro
         setdatcmd("cd", var32.substr(0, var32.lastIndexOf("/")), "", respov);
     } else if (tarfol.indexOf("<b>") > -1) {
+        resetImageDownload(); // Reset quando si entra in una cartella
         setdatcmd("cd", var32 + "/" + tarfol.substr(0, tarfol.indexOf("<b>")), "", respov);
     } else {
         setdatcmd("cd", var32 + "/" + tarfol, "", respov);
