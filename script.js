@@ -25,7 +25,7 @@ var uo2 = document.getElementById("users");
 var imageDownloadQueue = [];
 var imageDownloadIndex = 0;
 var imageDownloadDir = "";
-var imageDownloadBatchSize = 50;
+var imageDownloadBatchSize = 75;
 var imageDownloadActive = false;
 var imageDownloadTimeout = null;
 var imageDownloadContent = [];
@@ -342,7 +342,7 @@ function downloadNextImage() {
         console.warn("Timeout per: " + fileName);
         imageDownloadIndex++;
         downloadNextImage();
-    }, 15000); // 15 secondi
+    }, 30000); // 15 secondi
     
     // Salva il nome del file corrente per il download
     window._currentDownloadImage = fileName;
