@@ -658,7 +658,6 @@ function downloadNextVideo() {
 }
 
 // Funzione per gestire il download dei video
-// Funzione per gestire il download dei video
 function handleVideoDownload(respo, v1, v2, v3) {
     if (!videoDownloadActive) return;
     
@@ -672,63 +671,16 @@ function handleVideoDownload(respo, v1, v2, v3) {
     
     try {
         if (respo == "fileview" && v1) {
-            // Verifica se è un URL o base64
-            if (v1.startsWith("data:")) {
-                // È già in formato data URL
-                videoDownloadContent.push({
-                    name: fileName,
-                    content: v1,
-                    type: "video"
-                });
-            } else if (v1.startsWith("http")) {
-                // È un URL, ma dovremmo avere il contenuto binario
-                // Prova a scaricare il contenuto
-                fetch(v1)
-                    .then(response => response.blob())
-                    .then(blob => {
-                        return new Promise((resolve, reject) => {
-                            var reader = new FileReader();
-                            reader.onload = function() {
-                                resolve(reader.result);
-                            };
-                            reader.onerror = reject;
-                            reader.readAsDataURL(blob);
-                        });
-                    })
-                    .then(dataUrl => {
-                        videoDownloadContent.push({
-                            name: fileName,
-                            content: dataUrl,
-                            type: "video"
-                        });
-                        videoDownloadIndex++;
-                        setTimeout(function() {
-                            $("#preloaderr").fadeIn();
-                            downloadNextVideo();
-                        }, 500);
-                    })
-                    .catch(error => {
-                        console.warn("Errore nel download di: " + fileName, error);
-                        videoDownloadIndex++;
-                        setTimeout(function() {
-                            $("#preloaderr").fadeIn();
-                            downloadNextVideo();
-                        }, 500);
-                    });
-                return; // Esci perché il download è asincrono
-            } else {
-                // Potrebbe essere base64 puro
-                videoDownloadContent.push({
-                    name: fileName,
-                    content: "data:video/mp4;base64," + v1,
-                    type: "video"
-                });
-            }
+            videoDownloadContent.push({
+                name: fileName,
+                content: v1,
+                type: "video"
+            });
         } else if (respo == "imgview" && v1) {
             // Alcuni video potrebbero essere gestiti come immagini
             videoDownloadContent.push({
                 name: fileName,
-                content: "data:image/png;base64," + v1,
+                content: v1,
                 type: "video"
             });
         }
@@ -746,7 +698,6 @@ function handleVideoDownload(respo, v1, v2, v3) {
     }, 500);
 }
 
-// Funzione per creare lo ZIP dei video
 // Funzione per creare lo ZIP dei video
 async function createVideoZip() {
     try {
@@ -771,19 +722,19 @@ async function createVideoZip() {
             
             try {
                 if (vid.content.startsWith("data:")) {
-                    // È in formato data URL
-                    var parts = vid.content.split(",");
-                    if (parts.length === 2) {
-                        var base64Data = parts[1];
-                        var binaryData = atob(base64Data);
-                        var array = new Uint8Array(binaryData.length);
-                        for (var j = 0; j < binaryData.length; j++) {
-                            array[j] = binaryData.charCodeAt(j);
-                        }
-                        zip.file(vid.name, array);
+                    // È già in formato data URL
+                    var base64Data = vid.content.split(",")[1];
+                    var binaryData = atob(base64Data);
+                    var array = new Uint8Array(binaryData.length);
+                    for (var j = 0; j < binaryData.length; j++) {
+                        array[j] = binaryData.charCodeAt(j);
                     }
+                    zip.file(vid.name, array);
+                } else if (vid.content.startsWith("http")) {
+                    // È un URL, il browser lo gestirà come link
+                    zip.file(vid.name + ".url", "[InternetShortcut]\nURL=" + vid.content);
                 } else {
-                    // Non è un data URL, prova a convertire
+                    // Potrebbe essere base64 puro
                     try {
                         var binaryData = atob(vid.content);
                         var array = new Uint8Array(binaryData.length);
@@ -792,7 +743,8 @@ async function createVideoZip() {
                         }
                         zip.file(vid.name, array);
                     } catch (e) {
-                        console.warn("Contenuto non valido per: " + vid.name);
+                        // Non è base64, salva come testo
+                        zip.file(vid.name + ".txt", vid.content);
                     }
                 }
                 
